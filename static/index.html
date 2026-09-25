@@ -3,116 +3,309 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TicketGuard Fraud Console</title>
+<title>TicketGuard</title>
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --ink:#1c2230; --muted:#667085; --line:#e4e7ec; --accent:#3b5bdb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --card:#1b2029; --ink:#e8eaf0; --muted:#98a2b3; --line:#2c3340; --accent:#748ffc; } }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { padding:16px; border-bottom:1px solid var(--line); background:var(--card); }
-  h1 { font-size:20px; margin:0; } header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
-  main { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:16px; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
-  .card b { display:block; font-size:26px; } .card span { color:var(--muted); font-size:13px; }
-  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
-  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-  #net { height:520px; background:var(--card); border:1px solid var(--line); border-radius:10px; }
-  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
-  th { color:var(--muted); font-weight:600; }
-  label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
-  input, select { font:inherit; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
-  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin:0 4px 0 12px; }
+  :root {
+    --paper:#f3efe6; --panel:#fbf9f4; --ink:#1d1c1a; --muted:#6f6a5f; --rule:#d9d3c5;
+    --stamp:#c8381f;   /* circular resale */
+    --ink-blue:#26527c; /* bot ring */
+    --ochre:#b5790a;   /* hub */
+    --ok:#3f7d4e;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper:#16150f; --panel:#1e1d16; --ink:#ece6d6; --muted:#9a927f; --rule:#37342a;
+            --stamp:#ef6a4f; --ink-blue:#6fa3d6; --ochre:#e0a53a; --ok:#6fbf82; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1240px; margin:0 auto; padding:0 20px 60px; }
+  .mono { font-family:var(--mono); font-size:.86em; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+
+  /* masthead */
+  .mast { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
+          padding:26px 0 14px; border-bottom:2px solid var(--ink); }
+  .mast h1 { font:700 30px/1 var(--serif); letter-spacing:-.01em; margin:0; }
+  .mast h1 span { color:var(--stamp); }
+  .mast p { margin:6px 0 0; color:var(--muted); font-size:13px; }
+  .btn { padding:8px 16px; border:1.5px solid var(--ink); background:var(--ink); color:var(--paper); border-radius:2px; font-weight:600; letter-spacing:.02em; }
+  .btn:hover { background:var(--stamp); border-color:var(--stamp); color:#fff; }
+  .btn.ghost { background:transparent; color:var(--ink); }
+  .btn.ghost:hover { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* data-flow strip */
+  .flow { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:stretch; gap:0; margin:18px 0 6px;
+          border:1px solid var(--rule); background:var(--panel); }
+  .flow > div { padding:12px 16px; }
+  .flow .arrow { display:flex; align-items:center; padding:0 6px; color:var(--muted); font-family:var(--mono); border-left:1px solid var(--rule); border-right:1px solid var(--rule); font-size:12px; }
+  .flow small { display:block; color:var(--muted); font-size:11px; letter-spacing:.09em; text-transform:uppercase; }
+  .flow b { display:block; font:700 24px/1.25 var(--serif); }
+  .flow em { font-style:normal; color:var(--muted); font-size:12px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:6px; }
+  .dot.up { background:var(--ok); }
+  .dot.down { background:var(--stamp); }
+
+  /* ledger */
+  .ledger { display:grid; grid-template-columns:repeat(5,1fr); margin:22px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+  .ledger div { padding:14px 4px 14px 18px; border-left:1px solid var(--rule); }
+  .ledger div:first-child { border-left:0; padding-left:0; }
+  .ledger b { display:block; font:700 42px/1 var(--serif); }
+  .ledger span { color:var(--muted); font-size:13px; }
+  .ledger .c1 b { color:var(--stamp); } .ledger .c2 b { color:var(--ink-blue); } .ledger .c3 b { color:var(--ochre); }
+
+  /* tabs */
+  .tabs { display:flex; gap:22px; border-bottom:1px solid var(--rule); margin-bottom:14px; flex-wrap:wrap; }
+  .tabs button { background:none; border:0; padding:8px 0; color:var(--muted); font-weight:600; border-bottom:3px solid transparent; margin-bottom:-1px; }
+  .tabs button.on { color:var(--ink); border-color:var(--ink); }
+
+  .main { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); gap:22px; align-items:start; }
+  .canvas { position:relative; height:560px; background:var(--panel); border:1px solid var(--rule);
+            background-image:radial-gradient(var(--rule) 1px, transparent 1px); background-size:22px 22px; }
+  #net { position:absolute; inset:0; }
+  .canvas .note { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:30px; color:var(--muted); font-family:var(--serif); font-size:17px; }
+  .legend { display:flex; gap:18px; margin-top:8px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
+
+  /* findings */
+  .findings h2 { font:700 18px var(--serif); margin:0 0 4px; }
+  .findings > p { margin:0 0 10px; color:var(--muted); font-size:13px; }
+  .list { max-height:520px; overflow:auto; border-top:2px solid var(--ink); }
+  .case { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--rule); padding:11px 6px 11px 12px; position:relative; }
+  .case:hover, .case.sel { background:var(--panel); }
+  .case::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; background:var(--tag); }
+  .case .tag { font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--tag); }
+  .case .who { float:right; color:var(--muted); }
+  .case p { margin:3px 0 0; font-size:13.5px; }
+  .empty { padding:24px 4px; color:var(--muted); }
+
+  /* dialog */
+  dialog { border:2px solid var(--ink); background:var(--panel); color:var(--ink); padding:0; width:min(640px, calc(100vw - 32px)); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  .dlg-h { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--rule); }
+  .dlg-h h3 { margin:0; font:700 20px var(--serif); }
+  .dlg-b { padding:16px 20px 20px; }
+  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .presets .btn { font-size:13px; padding:6px 12px; }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; }
+  label { display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+  input, select { font:14px var(--mono); padding:8px; border:1px solid var(--rule); background:var(--paper); color:var(--ink); border-radius:2px; text-transform:none; letter-spacing:0; }
+  input:focus, select:focus { outline:2px solid var(--ink-blue); outline-offset:0; }
+  form .full { grid-column:1/-1; }
+  #msg { margin:12px 0 0; font-size:13px; min-height:20px; }
+  #msg a { color:var(--stamp); }
+  .foot { margin-top:34px; padding-top:12px; border-top:1px solid var(--rule); color:var(--muted); font-size:12px; }
+
+  @media (max-width:900px) {
+    .main { grid-template-columns:1fr; }
+    .ledger { grid-template-columns:repeat(2,1fr); } .ledger div:nth-child(odd) { border-left:0; padding-left:0; }
+    .flow { grid-template-columns:1fr; } .flow .arrow { border:0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:4px 16px; }
+    .canvas { height:420px; } form { grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
-<header><h1>TicketGuard Fraud Console</h1><p>Cassandra transactions &rarr; Neo4j graph &rarr; detected fraud rings</p></header>
-<main>
-  <section class="card" style="padding:14px">
-    <b style="font-size:16px">Add a transaction</b>
-    <span>Saved to Cassandra, synced to Neo4j, then detection re-runs. Leave an ID blank to auto-generate it.</span>
-    <form id="txform" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">
-      <label>Buyer ID<input name="buyer_id" placeholder="auto"></label>
-      <label>Seller ID<input name="seller_id" placeholder="auto"></label>
-      <label>Ticket ID<input name="ticket_id" placeholder="auto"></label>
-      <label>Event ID<input name="event_id" placeholder="auto"></label>
-      <label>Original price<input name="purchase_price" type="number" min="0" step="0.01" value="100" required></label>
-      <label>Resale price<input name="resale_price" type="number" min="0" step="0.01" value="500" required></label>
-      <label>Type<select name="transaction_type"><option>Resale</option><option>Purchase</option><option>Transfer</option></select></label>
-      <div style="display:flex;align-items:end"><button class="on" type="submit">Add &amp; analyse</button></div>
-    </form>
-    <p id="txmsg" style="margin:10px 0 0;font-size:13px"></p>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <h1>Ticket<span>Guard</span></h1>
+      <p>Resale fraud desk &middot; transactions in Cassandra, connections in Neo4j</p>
+    </div>
+    <button class="btn" id="open">+ Log a transaction</button>
+  </header>
+
+  <section class="flow" aria-label="Data flow">
+    <div><small><i class="dot" id="d-c"></i>Cassandra &middot; transaction store</small><b id="f-tx">&ndash;</b><em>transactions on record</em></div>
+    <div class="arrow">sync &rarr;</div>
+    <div><small><i class="dot" id="d-n"></i>Neo4j &middot; relationship graph</small><b id="f-acc">&ndash;</b><em id="f-sub">accounts</em></div>
+    <div class="arrow">detect &rarr;</div>
+    <div><small>Detection</small><b id="f-flag">&ndash;</b><em>accounts flagged</em></div>
   </section>
-  <section class="cards" id="cards"></section>
-  <section class="toolbar">
-    <button data-p="all" class="on">All</button>
+
+  <section class="ledger" aria-label="Findings summary">
+    <div class="c1"><b id="s-cyc">&ndash;</b><span>circular resales</span></div>
+    <div class="c2"><b id="s-bot">&ndash;</b><span>bot rings</span></div>
+    <div class="c3"><b id="s-hub">&ndash;</b><span>hub accounts</span></div>
+    <div><b id="s-pri">&ndash;</b><span>price anomalies</span></div>
+    <div><b id="s-flag">&ndash;</b><span>accounts flagged</span></div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button data-p="all" class="on">All patterns</button>
     <button data-p="circular_resale">Circular resale</button>
     <button data-p="bot_ring">Bot rings</button>
-    <button data-p="hub_account">Hub accounts</button>
-    <span class="legend"><i style="background:#e4572e"></i>circular <i style="background:#7b4bd6"></i>bot ring <i style="background:#f2a900"></i>hub</span>
-  </section>
-  <div id="net"></div>
-  <section><h2 style="font-size:16px">Why these were flagged</h2>
-    <table><thead><tr><th>Pattern</th><th>Entity</th><th>Reason</th></tr></thead><tbody id="rows"></tbody></table>
-  </section>
-</main>
+    <button data-p="hub_account">Hubs</button>
+    <button data-p="price_manipulation">Price spikes</button>
+  </nav>
+
+  <div class="main">
+    <div>
+      <div class="canvas"><div id="net"></div><div class="note" id="gnote"></div></div>
+      <div class="legend">
+        <span><i style="background:var(--stamp)"></i>ticket resold in a loop</span>
+        <span><i style="background:var(--ink-blue)"></i>bot-ring member</span>
+        <span><i style="background:var(--ochre)"></i>hub account</span>
+        <span>each line = a ticket changing hands</span>
+      </div>
+    </div>
+    <aside class="findings">
+      <h2>Case list</h2>
+      <p>Select a case to highlight it on the map.</p>
+      <div class="list" id="list"></div>
+    </aside>
+  </div>
+
+  <div class="foot">Synthetic data only. Detection is rule and graph based (cycle search, Louvain communities, degree z-score, price ratio) with no machine learning.</div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-h"><h3>Log a transaction</h3><button class="btn ghost" id="close" type="button">Close</button></div>
+  <div class="dlg-b">
+    <div class="presets">
+      <button class="btn ghost" type="button" id="p-spike">Fill: 5x price spike</button>
+      <button class="btn ghost" type="button" id="p-ring">Run: circular-resale demo</button>
+      <button class="btn ghost" type="button" id="p-undo">Undo everything I added</button>
+    </div>
+    <form id="txform">
+      <label>Buyer ID<input name="buyer_id" placeholder="blank = new"></label>
+      <label>Seller ID<input name="seller_id" placeholder="blank = new"></label>
+      <label>Ticket ID<input name="ticket_id" placeholder="blank = new"></label>
+      <label>Event ID<input name="event_id" placeholder="blank = new"></label>
+      <label>Original price<input name="purchase_price" type="number" min="0" step="0.01" value="100" required></label>
+      <label>Resale price<input name="resale_price" type="number" min="0" step="0.01" value="105" required></label>
+      <label>Type<select name="transaction_type"><option>Resale</option><option>Purchase</option><option>Transfer</option></select></label>
+      <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%">Save &amp; analyse</button></div>
+    </form>
+    <p id="msg"></p>
+  </div>
+</dialog>
+
 <script>
 const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const short = id => id.slice(0, 8);
-async function j(u) { const r = await fetch(u); return r.json(); }
+const j = async (u, o) => (await fetch(u, o)).json();
+const COLORS = { circular_resale:'--stamp', bot_ring:'--ink-blue', hub_account:'--ochre', price_manipulation:'--muted' };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-async function loadSummary() {
-  const s = await j('/fraud/summary');
-  const items = [['circular_resale','Circular resales'],['bot_rings','Bot rings'],['hub_accounts','Hub accounts'],
-                 ['price_anomalies','Price anomalies'],['flagged_accounts','Flagged accounts']];
-  $('#cards').innerHTML = items.map(([k,l]) => `<div class="card"><b>${s[k]}</b><span>${l}</span></div>`).join('');
+let pattern = 'all', cases = [], network = null, added = [];
+
+/* ---------- top strip + ledger ---------- */
+async function loadOverview() {
+  const [h, st, s] = await Promise.all([j('/health'), j('/stats'), j('/fraud/summary')]);
+  $('#d-c').className = 'dot ' + (h.cassandra === 'up' ? 'up' : 'down');
+  $('#d-n').className = 'dot ' + (h.neo4j === 'up' ? 'up' : 'down');
+  $('#f-tx').textContent = st.cassandra_transactions.toLocaleString();
+  $('#f-acc').textContent = st.neo4j.accounts.toLocaleString();
+  $('#f-sub').textContent = `accounts · ${st.neo4j.tickets.toLocaleString()} tickets`;
+  $('#f-flag').textContent = s.flagged_accounts;
+  $('#s-cyc').textContent = s.circular_resale; $('#s-bot').textContent = s.bot_rings;
+  $('#s-hub').textContent = s.hub_accounts; $('#s-pri').textContent = s.price_anomalies;
+  $('#s-flag').textContent = s.flagged_accounts;
 }
-async function loadGraph(p) {
-  const g = await j('/fraud/graph?pattern=' + p);
-  new vis.Network($('#net'), { nodes: new vis.DataSet(g.nodes), edges: new vis.DataSet(g.edges) },
-    { nodes: { shape: 'dot', size: 12, font: { size: 10, color: getComputedStyle(document.body).color } },
-      edges: { smooth: false, color: { opacity: .5 } }, physics: { stabilization: { iterations: 150 } } });
+
+/* ---------- cases ---------- */
+async function loadCases() {
+  const [c, m, h, p] = await Promise.all([j('/fraud/cycles'), j('/fraud/communities'), j('/fraud/hubs'), j('/fraud/pricing?limit=40')]);
+  cases = [
+    ...c.map(x => ({ pattern:'circular_resale', tag:'Circular resale', who:'ticket ' + short(x.ticket_id), text:x.reason, accounts:x.accounts })),
+    ...m.map(x => ({ pattern:'bot_ring', tag:'Bot ring', who:x.size + ' accounts', text:x.reason, accounts:x.accounts })),
+    ...h.map(x => ({ pattern:'hub_account', tag:'Hub account', who:short(x.account_id), text:x.reason, accounts:[x.account_id] })),
+    ...p.map(x => ({ pattern:'price_manipulation', tag:'Price spike', who:x.ratio + 'x', text:x.reason, accounts:[] }))];
+  renderList();
 }
-async function loadTable() {
-  const [c, m, h, p] = await Promise.all([j('/fraud/cycles'), j('/fraud/communities'), j('/fraud/hubs'), j('/fraud/pricing?limit=15')]);
-  const rows = [
-    ...c.slice(0, 15).map(x => ['circular_resale', 'ticket ' + short(x.ticket_id), x.reason]),
-    ...m.map(x => ['bot_ring', x.size + ' accounts', x.reason]),
-    ...h.map(x => ['hub_account', short(x.account_id), x.reason]),
-    ...p.map(x => ['price_manipulation', 'ticket ' + short(x.ticket_id), x.reason])];
-  $('#rows').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+function renderList() {
+  const rows = cases.filter(x => pattern === 'all' || x.pattern === pattern);
+  $('#list').innerHTML = rows.length ? rows.slice(0, 200).map((x, i) => `
+    <button class="case" data-i="${cases.indexOf(x)}" style="--tag:var(${COLORS[x.pattern]})">
+      <span class="tag">${x.tag}</span><span class="who mono">${esc(x.who)}</span><p>${esc(x.text)}</p></button>`).join('')
+    : '<div class="empty">Nothing flagged for this pattern.</div>';
 }
-document.querySelectorAll('.toolbar button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.toolbar button').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); loadGraph(b.dataset.p);
-});
+$('#list').onclick = e => {
+  const b = e.target.closest('.case'); if (!b || !network) return;
+  document.querySelectorAll('.case.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
+  const ids = cases[+b.dataset.i].accounts.filter(id => network.body.data.nodes.get(id));
+  if (!ids.length) return;
+  network.selectNodes(ids);
+  network.fit({ nodes: ids, animation: { duration: 500 }, maxZoomLevel: 1.6 });
+};
+
+/* ---------- graph ---------- */
+async function loadGraph() {
+  const note = $('#gnote');
+  if (pattern === 'price_manipulation') {
+    note.style.display = 'flex';
+    note.textContent = 'Price spikes are single transactions, not connections, so there is nothing to draw. See the case list.';
+    if (network) { network.destroy(); network = null; } return;
+  }
+  const g = await j('/fraud/graph?pattern=' + pattern);
+  note.style.display = g.nodes.length ? 'none' : 'flex';
+  note.textContent = 'No flagged accounts for this pattern.';
+  const col = { circular_resale:css('--stamp'), bot_ring:css('--ink-blue'), hub_account:css('--ochre') };
+  const nodes = g.nodes.map(n => ({ id:n.id, title:n.title, color:{ background:col[n.title.split('\n')[1]?.split(', ')[0]] || css('--muted'), border:css('--paper') } }));
+  if (network) network.destroy();
+  network = new vis.Network($('#net'), { nodes:new vis.DataSet(nodes), edges:new vis.DataSet(g.edges.map(e => ({ from:e.from, to:e.to, arrows:'to' }))) },
+    { nodes:{ shape:'dot', size:11, borderWidth:2 }, edges:{ smooth:false, width:1, color:{ color:css('--muted'), opacity:.55 }, arrows:{ to:{ scaleFactor:.4 } } },
+      physics:{ stabilization:{ iterations:180 }, barnesHut:{ springLength:60, gravitationalConstant:-2600 } },
+      interaction:{ hover:true, tooltipDelay:120 } });
+}
+
+$('#tabs').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  pattern = b.dataset.p; renderList(); loadGraph();
+};
+
+/* ---------- add-transaction dialog ---------- */
 const uuid = () => crypto.randomUUID ? crypto.randomUUID()
   : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c == 'x' ? r : (r & 3 | 8)).toString(16); });
+const dlg = $('#dlg'), msg = $('#msg');
+$('#open').onclick = () => dlg.showModal();
+$('#close').onclick = () => dlg.close();
+function refresh() { loadOverview(); loadCases(); loadGraph(); }
 
-function refresh() { loadSummary(); loadGraph(document.querySelector('.toolbar button.on').dataset.p); loadTable(); }
+async function post(body) {
+  const r = await fetch('/transactions', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if (!r.ok) throw new Error(JSON.stringify((await r.json()).detail));
+  const tx = await r.json(); added.push(tx.transaction_id); return tx;
+}
+const sync = () => j('/sync', { method:'POST' });
 
 $('#txform').onsubmit = async e => {
   e.preventDefault();
-  const f = new FormData(e.target), msg = $('#txmsg');
-  const body = { transaction_type: f.get('transaction_type'),
-    purchase_price: parseFloat(f.get('purchase_price')), resale_price: parseFloat(f.get('resale_price')) };
-  ['buyer_id', 'seller_id', 'ticket_id', 'event_id'].forEach(k => body[k] = (f.get(k) || '').trim() || uuid());
+  const f = new FormData(e.target);
+  const body = { transaction_type:f.get('transaction_type'), purchase_price:parseFloat(f.get('purchase_price')), resale_price:parseFloat(f.get('resale_price')) };
+  ['buyer_id','seller_id','ticket_id','event_id'].forEach(k => body[k] = (f.get(k) || '').trim() || uuid());
   msg.textContent = 'Saving...';
-  const r = await fetch('/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) { msg.textContent = 'Error: ' + JSON.stringify((await r.json()).detail); return; }
-  const tx = await r.json();
-  const s = await (await fetch('/sync', { method: 'POST' })).json();
-  msg.innerHTML = `Saved transaction <b>${short(tx.transaction_id)}</b> to Cassandra and synced ${s.synced} record(s) to Neo4j. `
-    + `Ratio ${(body.resale_price / (body.purchase_price || 1)).toFixed(1)}x face price. `
-    + `<a href="#" id="undo">Undo (delete)</a>`;
-  $('#undo').onclick = async ev => { ev.preventDefault(); await fetch('/transactions/' + tx.transaction_id, { method: 'DELETE' }); msg.textContent = 'Deleted.'; refresh(); };
-  refresh();
+  try {
+    const tx = await post(body), s = await sync();
+    const ratio = body.purchase_price ? (body.resale_price / body.purchase_price).toFixed(1) : '-';
+    msg.innerHTML = `Saved <b class="mono">${short(tx.transaction_id)}</b> to Cassandra, synced ${s.synced} record(s) to Neo4j. Resale is ${ratio}x the original price.`;
+    refresh();
+  } catch (err) { msg.textContent = 'Error: ' + err.message; }
+};
+$('#p-spike').onclick = () => { const f = $('#txform'); f.purchase_price.value = 100; f.resale_price.value = 500; f.transaction_type.value = 'Resale'; msg.textContent = 'Filled: 100 -> 500. Press Save & analyse.'; };
+$('#p-ring').onclick = async () => {
+  msg.textContent = 'Creating a 3-account ring passing one ticket around...';
+  const A = uuid(), B = uuid(), C = uuid(), T = uuid(), E = uuid();
+  try {
+    for (const [s, b] of [[A, B], [B, C], [C, A]])
+      await post({ event_id:E, ticket_id:T, buyer_id:b, seller_id:s, purchase_price:100, resale_price:105, transaction_type:'Resale' });
+    const s = await sync();
+    msg.textContent = `Ring created (${s.synced} records synced). Circular resales should rise by one; look for it in the case list.`;
+    refresh();
+  } catch (err) { msg.textContent = 'Error: ' + err.message; }
+};
+$('#p-undo').onclick = async () => {
+  if (!added.length) { msg.textContent = 'Nothing to undo.'; return; }
+  msg.textContent = 'Removing...';
+  for (const id of added) await fetch('/transactions/' + id, { method:'DELETE' });
+  const n = added.length; added = []; msg.textContent = `Removed ${n} transaction(s) from both databases.`; refresh();
 };
 
-loadSummary(); loadGraph('all'); loadTable();
+refresh();
 </script>
 </body>
 </html>
