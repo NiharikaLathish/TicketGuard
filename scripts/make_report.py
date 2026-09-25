@@ -98,7 +98,7 @@ doc.add_heading("1. Summary of Progress", 1)
 para("Review 1 finalised the problem, requirements, database choice, architecture and initial schema. Review 2 delivers the "
      "working prototype: both databases are implemented, populated with a 50,000-transaction synthetic dataset, "
      "synchronised, and exposed through a REST API. All four planned fraud detectors run on the Neo4j graph, and every "
-     "finding carries a plain-language reason. The prototype is checked by 10 automated tests, all passing.")
+     "finding carries a plain-language reason. The prototype is checked by 19 automated tests, all passing.")
 table(["Plan phase (Review 1)", "Status", "Evidence"], [
     ["5. Synthetic data generation", "Done", "generator/generate.py; dumps/sample_dataset.csv"],
     ["6. Cassandra implementation + CRUD", "Done", "app/db/cassandra_db.py; 4 query tables"],
@@ -173,7 +173,8 @@ para("Updating or deleting a transaction updates all four Cassandra tables and t
 doc.add_heading("4.3 Synchronisation", 2)
 para("The sync module reads Cassandra day partitions from the stored watermark onwards and upserts them into Neo4j with "
      "MERGE, in batches of 2,000. It is idempotent: a second run reports zero new records. A full re-sync is available "
-     "with full=true.")
+     "with full=true. A background worker repeats the sync automatically every 60 seconds (configurable, and it can be turned off), "
+     "so new transactions reach the graph without a manual call.")
 doc.add_heading("4.4 Fraud detection", 2)
 table(["Pattern", "Method", "Explanation produced"], [
     ["Circular resale", "Cypher variable-length path over TRANSFERRED_TO restricted to one ticket, returning to the start",
@@ -220,13 +221,14 @@ para("Measured on a single laptop with one Cassandra node, so throughput figures
 
 # ------------------------------------------------------------------ 6
 doc.add_heading("6. Testing", 1)
-para("Ten automated integration tests (pytest) run against the live databases and pass:")
+para("Nineteen automated integration tests (pytest) run against the live databases and pass:")
 bullets([
     "Health check of both databases.",
     "Transaction CRUD lifecycle, including that every query table returns the row and that update and delete propagate.",
     "Input validation and error codes (422, 400, 404).",
     "Account CRUD lifecycle in Neo4j.",
     "Sync: a new transaction reaches the graph, a second sync is a no-op, deleting the transaction removes it from the graph.",
+    "Extra tests for malformed input, unknown ids, result ordering, sync idempotency, detector parameters and the background sync.",
     "Four detection tests asserting recall and precision thresholds against the ground truth, and that every "
     "finding has an explanation.",
 ])

@@ -29,6 +29,8 @@ IDs are UUIDs. Timestamps are ISO-8601 UTC.
 | GET | `/tickets/{id}/history` | Ordered ownership transfers of a ticket |
 
 ## Synchronisation
+A background worker also runs this sync automatically every `SYNC_INTERVAL_SECONDS` (default 60, set 0 to disable), so calling the endpoint is only needed for an immediate sync or a full re-sync.
+
 | Method | Path | Description |
 |---|---|---|
 | POST | `/sync?full=false` | Copy transactions newer than the stored watermark from Cassandra into Neo4j. `full=true` re-syncs everything. Idempotent |

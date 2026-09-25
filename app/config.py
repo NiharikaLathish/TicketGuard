@@ -10,5 +10,8 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://127.0.0.1:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "ticketguard123")
 
+# Seconds between automatic Cassandra -> Neo4j syncs (0 turns the background sync off).
+SYNC_INTERVAL_SECONDS = float(os.getenv("SYNC_INTERVAL_SECONDS", "60"))
+
 # Fixed pseudo-account that is the seller on primary-market purchases.
 PLATFORM_ACCOUNT_ID = "00000000-0000-0000-0000-000000000001"

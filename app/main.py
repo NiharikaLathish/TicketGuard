@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from app import config, detection, sync
+from app import config, detection, sync, sync_worker
 from app.db import cassandra_db, neo4j_db
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -18,7 +18,12 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 async def lifespan(app: FastAPI):
     cassandra_db.init_schema()
     neo4j_db.init_schema()
+    stop = None
+    if config.SYNC_INTERVAL_SECONDS > 0:
+        _, stop = sync_worker.start(config.SYNC_INTERVAL_SECONDS)
     yield
+    if stop:
+        stop.set()
 
 
 app = FastAPI(title="TicketGuard API", version="0.2.0", lifespan=lifespan,
