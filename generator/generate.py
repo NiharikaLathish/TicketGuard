@@ -38,7 +38,7 @@ class Gen:
         return str(uuid.UUID(int=self.rng.getrandbits(128), version=4))
 
     def rand_ts(self) -> datetime:
-        return self.start + timedelta(seconds=self.rng.uniform(0, (self.end - self.start).total_seconds() - 7200))
+        return self.start + timedelta(seconds=self.rng.uniform(0, (self.end - self.start).total_seconds() - 4 * 86400))
 
     def add(self, event, ticket, buyer, seller, ts, purchase, resale, kind, pattern="none"):
         self.txs.append({

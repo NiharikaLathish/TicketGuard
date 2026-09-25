@@ -21,6 +21,8 @@ uvicorn app.main:app --reload              # API docs: http://localhost:8000/doc
 
 Open http://localhost:8000/ for the fraud console (graph of detected rings and the reasons they were flagged).
 
+Evaluation vs. ground truth: `python -m scripts.evaluate`
+
 Tests (both databases must be up and loaded): `pytest -v`
 Database dump: `python -m scripts.dump` (writes to `dumps/`).
 

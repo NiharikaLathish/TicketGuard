@@ -1,0 +1,34 @@
+{
+ "circular_resale": {
+  "expected": 98,
+  "found": 98,
+  "true_positives": 98,
+  "precision": 1.0,
+  "recall": 1.0,
+  "seconds": 0.09
+ },
+ "bot_ring": {
+  "expected": 66,
+  "found": 66,
+  "true_positives": 66,
+  "precision": 1.0,
+  "recall": 1.0,
+  "seconds": 1.53
+ },
+ "hub_account": {
+  "expected": 5,
+  "found": 5,
+  "true_positives": 5,
+  "precision": 1.0,
+  "recall": 1.0,
+  "seconds": 0.28
+ },
+ "price_manipulation": {
+  "expected": 150,
+  "found": 150,
+  "true_positives": 150,
+  "precision": 1.0,
+  "recall": 1.0,
+  "seconds": 0.03
+ }
+}
