@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketGuard Fraud Console</title>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1c2230; --muted:#667085; --line:#e4e7ec; --accent:#3b5bdb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --card:#1b2029; --ink:#e8eaf0; --muted:#98a2b3; --line:#2c3340; --accent:#748ffc; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px; border-bottom:1px solid var(--line); background:var(--card); }
+  h1 { font-size:20px; margin:0; } header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  main { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .card b { display:block; font-size:26px; } .card span { color:var(--muted); font-size:13px; }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #net { height:520px; background:var(--card); border:1px solid var(--line); border-radius:10px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin:0 4px 0 12px; }
+</style>
+</head>
+<body>
+<header><h1>TicketGuard Fraud Console</h1><p>Cassandra transactions &rarr; Neo4j graph &rarr; detected fraud rings</p></header>
+<main>
+  <section class="cards" id="cards"></section>
+  <section class="toolbar">
+    <button data-p="all" class="on">All</button>
+    <button data-p="circular_resale">Circular resale</button>
+    <button data-p="bot_ring">Bot rings</button>
+    <button data-p="hub_account">Hub accounts</button>
+    <span class="legend"><i style="background:#e4572e"></i>circular <i style="background:#7b4bd6"></i>bot ring <i style="background:#f2a900"></i>hub</span>
+  </section>
+  <div id="net"></div>
+  <section><h2 style="font-size:16px">Why these were flagged</h2>
+    <table><thead><tr><th>Pattern</th><th>Entity</th><th>Reason</th></tr></thead><tbody id="rows"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const short = id => id.slice(0, 8);
+async function j(u) { const r = await fetch(u); return r.json(); }
+
+async function loadSummary() {
+  const s = await j('/fraud/summary');
+  const items = [['circular_resale','Circular resales'],['bot_rings','Bot rings'],['hub_accounts','Hub accounts'],
+                 ['price_anomalies','Price anomalies'],['flagged_accounts','Flagged accounts']];
+  $('#cards').innerHTML = items.map(([k,l]) => `<div class="card"><b>${s[k]}</b><span>${l}</span></div>`).join('');
+}
+async function loadGraph(p) {
+  const g = await j('/fraud/graph?pattern=' + p);
+  new vis.Network($('#net'), { nodes: new vis.DataSet(g.nodes), edges: new vis.DataSet(g.edges) },
+    { nodes: { shape: 'dot', size: 12, font: { size: 10, color: getComputedStyle(document.body).color } },
+      edges: { smooth: false, color: { opacity: .5 } }, physics: { stabilization: { iterations: 150 } } });
+}
+async function loadTable() {
+  const [c, m, h, p] = await Promise.all([j('/fraud/cycles'), j('/fraud/communities'), j('/fraud/hubs'), j('/fraud/pricing?limit=15')]);
+  const rows = [
+    ...c.slice(0, 15).map(x => ['circular_resale', 'ticket ' + short(x.ticket_id), x.reason]),
+    ...m.map(x => ['bot_ring', x.size + ' accounts', x.reason]),
+    ...h.map(x => ['hub_account', short(x.account_id), x.reason]),
+    ...p.map(x => ['price_manipulation', 'ticket ' + short(x.ticket_id), x.reason])];
+  $('#rows').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+}
+document.querySelectorAll('.toolbar button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.toolbar button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); loadGraph(b.dataset.p);
+});
+loadSummary(); loadGraph('all'); loadTable();
+</script>
+</body>
+</html>
