@@ -3,180 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TicketGuard</title>
+<title>TicketGuard | Fraud Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
   :root {
-    --paper:#f3efe6; --panel:#fbf9f4; --ink:#1d1c1a; --muted:#6f6a5f; --rule:#d9d3c5;
-    --stamp:#c8381f;   /* circular resale */
-    --ink-blue:#26527c; /* bot ring */
-    --ochre:#b5790a;   /* hub */
-    --ok:#3f7d4e;
-    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
-    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --bg:#f5f6f8; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e8eaee;
+    --primary:#2563eb; --primary-ink:#ffffff; --shadow:0 1px 2px rgba(15,23,42,.05), 0 1px 3px rgba(15,23,42,.04);
+    --c-circ:#dc2626; --c-bot:#0d9488; --c-hub:#d97706; --c-price:#64748b; --ok:#16a34a; --bad:#dc2626;
+    --font:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --paper:#16150f; --panel:#1e1d16; --ink:#ece6d6; --muted:#9a927f; --rule:#37342a;
-            --stamp:#ef6a4f; --ink-blue:#6fa3d6; --ochre:#e0a53a; --ok:#6fbf82; }
+    :root { --bg:#0b1120; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --line:#1f2937;
+            --primary:#3b82f6; --shadow:none; --c-circ:#f87171; --c-bot:#2dd4bf; --c-hub:#fbbf24; --c-price:#94a3b8; --ok:#4ade80; --bad:#f87171; }
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .wrap { max-width:1240px; margin:0 auto; padding:0 20px 60px; }
-  .mono { font-family:var(--mono); font-size:.86em; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 var(--font); -webkit-font-smoothing:antialiased; }
   button { font:inherit; color:inherit; cursor:pointer; }
+  .num { font-variant-numeric:tabular-nums; }
+  .mono { font-family:var(--mono); font-size:12px; }
 
-  /* masthead */
-  .mast { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
-          padding:26px 0 14px; border-bottom:2px solid var(--ink); }
-  .mast h1 { font:700 30px/1 var(--serif); letter-spacing:-.01em; margin:0; }
-  .mast h1 span { color:var(--stamp); }
-  .mast p { margin:6px 0 0; color:var(--muted); font-size:13px; }
-  .btn { padding:8px 16px; border:1.5px solid var(--ink); background:var(--ink); color:var(--paper); border-radius:2px; font-weight:600; letter-spacing:.02em; }
-  .btn:hover { background:var(--stamp); border-color:var(--stamp); color:#fff; }
-  .btn.ghost { background:transparent; color:var(--ink); }
-  .btn.ghost:hover { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  /* top bar */
+  .nav { background:var(--card); border-bottom:1px solid var(--line); }
+  .nav-in { max-width:1280px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; gap:20px; }
+  .brand { font-weight:700; font-size:17px; letter-spacing:-.01em; display:flex; align-items:center; gap:9px; }
+  .logo { width:26px; height:26px; border-radius:7px; background:var(--primary); display:grid; place-items:center; }
+  .logo svg { width:15px; height:15px; fill:none; stroke:#fff; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  .grow { flex:1; }
+  .pill { display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border:1px solid var(--line); border-radius:999px; font-size:12.5px; color:var(--muted); }
+  .pill b { color:var(--text); font-weight:600; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+  .dot.up { background:var(--ok); } .dot.down { background:var(--bad); }
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; border:1px solid transparent; background:var(--primary); color:var(--primary-ink); font-weight:600; font-size:13.5px; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn.sec { background:var(--card); color:var(--text); border-color:var(--line); font-weight:500; }
+  .btn.sec:hover { background:var(--bg); filter:none; }
 
-  /* data-flow strip */
-  .flow { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:stretch; gap:0; margin:18px 0 6px;
-          border:1px solid var(--rule); background:var(--panel); }
-  .flow > div { padding:12px 16px; }
-  .flow .arrow { display:flex; align-items:center; padding:0 6px; color:var(--muted); font-family:var(--mono); border-left:1px solid var(--rule); border-right:1px solid var(--rule); font-size:12px; }
-  .flow small { display:block; color:var(--muted); font-size:11px; letter-spacing:.09em; text-transform:uppercase; }
-  .flow b { display:block; font:700 24px/1.25 var(--serif); }
-  .flow em { font-style:normal; color:var(--muted); font-size:12px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:6px; }
-  .dot.up { background:var(--ok); }
-  .dot.down { background:var(--stamp); }
+  .page { max-width:1280px; margin:0 auto; padding:26px 24px 60px; }
+  .head h1 { font-size:22px; font-weight:700; letter-spacing:-.015em; margin:0; }
+  .head p { margin:4px 0 0; color:var(--muted); }
 
-  /* ledger */
-  .ledger { display:grid; grid-template-columns:repeat(5,1fr); margin:22px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
-  .ledger div { padding:14px 4px 14px 18px; border-left:1px solid var(--rule); }
-  .ledger div:first-child { border-left:0; padding-left:0; }
-  .ledger b { display:block; font:700 42px/1 var(--serif); }
-  .ledger span { color:var(--muted); font-size:13px; }
-  .ledger .c1 b { color:var(--stamp); } .ledger .c2 b { color:var(--ink-blue); } .ledger .c3 b { color:var(--ochre); }
+  /* KPI cards */
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:20px 0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
+  .kpi { padding:16px 18px; }
+  .kpi .lbl { color:var(--muted); font-size:12.5px; font-weight:500; display:flex; align-items:center; gap:8px; }
+  .kpi .lbl i { width:8px; height:8px; border-radius:50%; background:var(--c); }
+  .kpi .val { font-size:32px; font-weight:700; letter-spacing:-.02em; margin-top:6px; line-height:1.1; }
+  .kpi .sub { color:var(--muted); font-size:12.5px; margin-top:4px; }
 
-  /* tabs */
-  .tabs { display:flex; gap:22px; border-bottom:1px solid var(--rule); margin-bottom:14px; flex-wrap:wrap; }
-  .tabs button { background:none; border:0; padding:8px 0; color:var(--muted); font-weight:600; border-bottom:3px solid transparent; margin-bottom:-1px; }
-  .tabs button.on { color:var(--ink); border-color:var(--ink); }
-
-  .main { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); gap:22px; align-items:start; }
-  .canvas { position:relative; height:560px; background:var(--panel); border:1px solid var(--rule);
-            background-image:radial-gradient(var(--rule) 1px, transparent 1px); background-size:22px 22px; }
+  /* main */
+  .grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(340px,1fr); gap:16px; align-items:start; }
+  .card-h { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; flex-wrap:wrap; }
+  .card-h h2 { margin:0; font-size:15px; font-weight:600; }
+  .seg { display:inline-flex; background:var(--bg); border-radius:9px; padding:3px; gap:2px; flex-wrap:wrap; }
+  .seg button { background:none; border:0; padding:5px 11px; border-radius:7px; color:var(--muted); font-size:12.5px; font-weight:500; }
+  .seg button:hover { color:var(--text); }
+  .seg button.on { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(15,23,42,.12); }
+  .canvas { position:relative; height:520px; border-top:1px solid var(--line); overflow:hidden; }
   #net { position:absolute; inset:0; }
-  .canvas .note { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:30px; color:var(--muted); font-family:var(--serif); font-size:17px; }
-  .legend { display:flex; gap:18px; margin-top:8px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
-  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
+  .note { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:32px; color:var(--muted); }
+  .legend { display:flex; gap:16px; padding:11px 18px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
 
-  /* findings */
-  .findings h2 { font:700 18px var(--serif); margin:0 0 4px; }
-  .findings > p { margin:0 0 10px; color:var(--muted); font-size:13px; }
-  .list { max-height:520px; overflow:auto; border-top:2px solid var(--ink); }
-  .case { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--rule); padding:11px 6px 11px 12px; position:relative; }
-  .case:hover, .case.sel { background:var(--panel); }
-  .case::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; background:var(--tag); }
-  .case .tag { font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--tag); }
-  .case .who { float:right; color:var(--muted); }
-  .case p { margin:3px 0 0; font-size:13.5px; }
-  .empty { padding:24px 4px; color:var(--muted); }
+  /* case list */
+  .list { max-height:600px; overflow:auto; border-top:1px solid var(--line); }
+  .case { display:block; width:100%; text-align:left; background:none; border:0; padding:13px 18px; border-bottom:1px solid var(--line); }
+  .case:last-child { border-bottom:0; }
+  .case:hover { background:var(--bg); }
+  .case.sel { background:color-mix(in srgb, var(--primary) 8%, transparent); }
+  .case .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .badge { font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:6px; color:var(--tag); background:color-mix(in srgb, var(--tag) 12%, transparent); }
+  .case .who { color:var(--muted); }
+  .case p { margin:6px 0 0; color:var(--text); font-size:13px; line-height:1.45; }
+  .empty { padding:28px 18px; color:var(--muted); }
+  .count { color:var(--muted); font-weight:500; font-size:13px; }
+
+  .foot { margin-top:26px; color:var(--muted); font-size:12.5px; }
 
   /* dialog */
-  dialog { border:2px solid var(--ink); background:var(--panel); color:var(--ink); padding:0; width:min(640px, calc(100vw - 32px)); }
-  dialog::backdrop { background:rgba(0,0,0,.45); }
-  .dlg-h { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--rule); }
-  .dlg-h h3 { margin:0; font:700 20px var(--serif); }
-  .dlg-b { padding:16px 20px 20px; }
-  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
-  .presets .btn { font-size:13px; padding:6px 12px; }
-  form { display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; }
-  label { display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
-  input, select { font:14px var(--mono); padding:8px; border:1px solid var(--rule); background:var(--paper); color:var(--ink); border-radius:2px; text-transform:none; letter-spacing:0; }
-  input:focus, select:focus { outline:2px solid var(--ink-blue); outline-offset:0; }
-  form .full { grid-column:1/-1; }
-  #msg { margin:12px 0 0; font-size:13px; min-height:20px; }
-  #msg a { color:var(--stamp); }
-  .foot { margin-top:34px; padding-top:12px; border-top:1px solid var(--rule); color:var(--muted); font-size:12px; }
+  dialog { border:0; border-radius:14px; background:var(--card); color:var(--text); padding:0; width:min(620px, calc(100vw - 32px)); box-shadow:0 20px 50px rgba(15,23,42,.3); }
+  dialog::backdrop { background:rgba(15,23,42,.5); }
+  .dlg-h { display:flex; justify-content:space-between; align-items:center; padding:18px 22px 4px; }
+  .dlg-h h3 { margin:0; font-size:17px; font-weight:600; }
+  .x { background:none; border:0; font-size:22px; line-height:1; color:var(--muted); padding:2px 6px; border-radius:6px; }
+  .x:hover { background:var(--bg); }
+  .dlg-sub { padding:0 22px; margin:0; color:var(--muted); }
+  .dlg-b { padding:14px 22px 22px; }
+  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .presets .btn { font-size:12.5px; padding:6px 11px; }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  label { display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:500; color:var(--muted); }
+  input, select { font:13px var(--font); padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+  input.id { font-family:var(--mono); font-size:12px; }
+  input:focus, select:focus { outline:2px solid color-mix(in srgb, var(--primary) 40%, transparent); border-color:var(--primary); }
+  #msg { margin:14px 0 0; font-size:13px; min-height:18px; color:var(--muted); }
 
-  @media (max-width:900px) {
-    .main { grid-template-columns:1fr; }
-    .ledger { grid-template-columns:repeat(2,1fr); } .ledger div:nth-child(odd) { border-left:0; padding-left:0; }
-    .flow { grid-template-columns:1fr; } .flow .arrow { border:0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:4px 16px; }
-    .canvas { height:420px; } form { grid-template-columns:1fr; }
+  @media (max-width:980px) {
+    .kpis { grid-template-columns:repeat(2,1fr); } .grid { grid-template-columns:1fr; }
+    .pill.hide-m { display:none; } form { grid-template-columns:1fr; } .canvas { height:400px; }
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="mast">
-    <div>
-      <h1>Ticket<span>Guard</span></h1>
-      <p>Resale fraud desk &middot; transactions in Cassandra, connections in Neo4j</p>
-    </div>
-    <button class="btn" id="open">+ Log a transaction</button>
-  </header>
+<header class="nav"><div class="nav-in">
+  <div class="brand">
+    <span class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+    TicketGuard
+  </div>
+  <div class="grow"></div>
+  <span class="pill hide-m"><i class="dot" id="d-c"></i>Cassandra <b class="num" id="f-tx">&ndash;</b> transactions</span>
+  <span class="pill hide-m"><i class="dot" id="d-n"></i>Neo4j <b class="num" id="f-acc">&ndash;</b> accounts</span>
+  <button class="btn" id="open">Log transaction</button>
+</div></header>
 
-  <section class="flow" aria-label="Data flow">
-    <div><small><i class="dot" id="d-c"></i>Cassandra &middot; transaction store</small><b id="f-tx">&ndash;</b><em>transactions on record</em></div>
-    <div class="arrow">sync &rarr;</div>
-    <div><small><i class="dot" id="d-n"></i>Neo4j &middot; relationship graph</small><b id="f-acc">&ndash;</b><em id="f-sub">accounts</em></div>
-    <div class="arrow">detect &rarr;</div>
-    <div><small>Detection</small><b id="f-flag">&ndash;</b><em>accounts flagged</em></div>
-  </section>
-
-  <section class="ledger" aria-label="Findings summary">
-    <div class="c1"><b id="s-cyc">&ndash;</b><span>circular resales</span></div>
-    <div class="c2"><b id="s-bot">&ndash;</b><span>bot rings</span></div>
-    <div class="c3"><b id="s-hub">&ndash;</b><span>hub accounts</span></div>
-    <div><b id="s-pri">&ndash;</b><span>price anomalies</span></div>
-    <div><b id="s-flag">&ndash;</b><span>accounts flagged</span></div>
-  </section>
-
-  <nav class="tabs" id="tabs">
-    <button data-p="all" class="on">All patterns</button>
-    <button data-p="circular_resale">Circular resale</button>
-    <button data-p="bot_ring">Bot rings</button>
-    <button data-p="hub_account">Hubs</button>
-    <button data-p="price_manipulation">Price spikes</button>
-  </nav>
-
-  <div class="main">
-    <div>
-      <div class="canvas"><div id="net"></div><div class="note" id="gnote"></div></div>
-      <div class="legend">
-        <span><i style="background:var(--stamp)"></i>ticket resold in a loop</span>
-        <span><i style="background:var(--ink-blue)"></i>bot-ring member</span>
-        <span><i style="background:var(--ochre)"></i>hub account</span>
-        <span>each line = a ticket changing hands</span>
-      </div>
-    </div>
-    <aside class="findings">
-      <h2>Case list</h2>
-      <p>Select a case to highlight it on the map.</p>
-      <div class="list" id="list"></div>
-    </aside>
+<main class="page">
+  <div class="head">
+    <h1>Fraud monitoring</h1>
+    <p>Resale activity analysed as a network of accounts and tickets.</p>
   </div>
 
-  <div class="foot">Synthetic data only. Detection is rule and graph based (cycle search, Louvain communities, degree z-score, price ratio) with no machine learning.</div>
-</div>
+  <section class="kpis">
+    <div class="card kpi" style="--c:var(--c-circ)"><div class="lbl"><i></i>Circular resales</div><div class="val num" id="s-cyc">&ndash;</div><div class="sub">tickets returning to the seller</div></div>
+    <div class="card kpi" style="--c:var(--c-bot)"><div class="lbl"><i></i>Bot rings</div><div class="val num" id="s-bot">&ndash;</div><div class="sub">coordinated account groups</div></div>
+    <div class="card kpi" style="--c:var(--c-hub)"><div class="lbl"><i></i>Hub accounts</div><div class="val num" id="s-hub">&ndash;</div><div class="sub">unusually connected traders</div></div>
+    <div class="card kpi" style="--c:var(--c-price)"><div class="lbl"><i></i>Price anomalies</div><div class="val num" id="s-pri">&ndash;</div><div class="sub"><span class="num" id="s-flag">&ndash;</span> accounts flagged overall</div></div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-h">
+        <h2>Relationship map</h2>
+        <div class="seg" id="tabs">
+          <button data-p="all" class="on">All</button>
+          <button data-p="circular_resale">Circular</button>
+          <button data-p="bot_ring">Bot rings</button>
+          <button data-p="hub_account">Hubs</button>
+          <button data-p="price_manipulation">Pricing</button>
+        </div>
+      </div>
+      <div class="canvas"><div id="net"></div><div class="note" id="gnote"></div></div>
+      <div class="legend">
+        <span><i style="background:var(--c-circ)"></i>Circular resale</span>
+        <span><i style="background:var(--c-bot)"></i>Bot ring</span>
+        <span><i style="background:var(--c-hub)"></i>Hub account</span>
+        <span>Each link is a ticket changing hands</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Flagged cases <span class="count num" id="n-cases"></span></h2></div>
+      <div class="list" id="list"></div>
+    </section>
+  </div>
+
+  <p class="foot">Synthetic data. Detection uses graph analysis (cycle search, Louvain community detection, degree centrality) and price rules, with no machine learning.</p>
+</main>
 
 <dialog id="dlg">
-  <div class="dlg-h"><h3>Log a transaction</h3><button class="btn ghost" id="close" type="button">Close</button></div>
+  <div class="dlg-h"><h3>Log a transaction</h3><button class="x" id="close" type="button" aria-label="Close">&times;</button></div>
+  <p class="dlg-sub">Saved to Cassandra, synced to Neo4j, then detection re-runs.</p>
   <div class="dlg-b">
     <div class="presets">
-      <button class="btn ghost" type="button" id="p-spike">Fill: 5x price spike</button>
-      <button class="btn ghost" type="button" id="p-ring">Run: circular-resale demo</button>
-      <button class="btn ghost" type="button" id="p-undo">Undo everything I added</button>
+      <button class="btn sec" type="button" id="p-spike">Example: 5x price spike</button>
+      <button class="btn sec" type="button" id="p-ring">Run circular-resale demo</button>
+      <button class="btn sec" type="button" id="p-undo">Undo added transactions</button>
     </div>
     <form id="txform">
-      <label>Buyer ID<input name="buyer_id" placeholder="blank = new"></label>
-      <label>Seller ID<input name="seller_id" placeholder="blank = new"></label>
-      <label>Ticket ID<input name="ticket_id" placeholder="blank = new"></label>
-      <label>Event ID<input name="event_id" placeholder="blank = new"></label>
+      <label>Buyer ID<input class="id" name="buyer_id" placeholder="Auto-generate"></label>
+      <label>Seller ID<input class="id" name="seller_id" placeholder="Auto-generate"></label>
+      <label>Ticket ID<input class="id" name="ticket_id" placeholder="Auto-generate"></label>
+      <label>Event ID<input class="id" name="event_id" placeholder="Auto-generate"></label>
       <label>Original price<input name="purchase_price" type="number" min="0" step="0.01" value="100" required></label>
       <label>Resale price<input name="resale_price" type="number" min="0" step="0.01" value="105" required></label>
       <label>Type<select name="transaction_type"><option>Resale</option><option>Purchase</option><option>Transfer</option></select></label>
-      <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%">Save &amp; analyse</button></div>
+      <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%;justify-content:center">Save and analyse</button></div>
     </form>
     <p id="msg"></p>
   </div>
@@ -187,40 +191,38 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const short = id => id.slice(0, 8);
 const j = async (u, o) => (await fetch(u, o)).json();
-const COLORS = { circular_resale:'--stamp', bot_ring:'--ink-blue', hub_account:'--ochre', price_manipulation:'--muted' };
+const COLORS = { circular_resale:'--c-circ', bot_ring:'--c-bot', hub_account:'--c-hub', price_manipulation:'--c-price' };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 let pattern = 'all', cases = [], network = null, added = [];
 
-/* ---------- top strip + ledger ---------- */
 async function loadOverview() {
   const [h, st, s] = await Promise.all([j('/health'), j('/stats'), j('/fraud/summary')]);
   $('#d-c').className = 'dot ' + (h.cassandra === 'up' ? 'up' : 'down');
   $('#d-n').className = 'dot ' + (h.neo4j === 'up' ? 'up' : 'down');
   $('#f-tx').textContent = st.cassandra_transactions.toLocaleString();
   $('#f-acc').textContent = st.neo4j.accounts.toLocaleString();
-  $('#f-sub').textContent = `accounts · ${st.neo4j.tickets.toLocaleString()} tickets`;
-  $('#f-flag').textContent = s.flagged_accounts;
   $('#s-cyc').textContent = s.circular_resale; $('#s-bot').textContent = s.bot_rings;
   $('#s-hub').textContent = s.hub_accounts; $('#s-pri').textContent = s.price_anomalies;
   $('#s-flag').textContent = s.flagged_accounts;
 }
 
-/* ---------- cases ---------- */
 async function loadCases() {
   const [c, m, h, p] = await Promise.all([j('/fraud/cycles'), j('/fraud/communities'), j('/fraud/hubs'), j('/fraud/pricing?limit=40')]);
   cases = [
-    ...c.map(x => ({ pattern:'circular_resale', tag:'Circular resale', who:'ticket ' + short(x.ticket_id), text:x.reason, accounts:x.accounts })),
+    ...c.map(x => ({ pattern:'circular_resale', tag:'Circular resale', who:'Ticket ' + short(x.ticket_id), text:x.reason, accounts:x.accounts })),
     ...m.map(x => ({ pattern:'bot_ring', tag:'Bot ring', who:x.size + ' accounts', text:x.reason, accounts:x.accounts })),
-    ...h.map(x => ({ pattern:'hub_account', tag:'Hub account', who:short(x.account_id), text:x.reason, accounts:[x.account_id] })),
-    ...p.map(x => ({ pattern:'price_manipulation', tag:'Price spike', who:x.ratio + 'x', text:x.reason, accounts:[] }))];
+    ...h.map(x => ({ pattern:'hub_account', tag:'Hub account', who:'Account ' + short(x.account_id), text:x.reason, accounts:[x.account_id] })),
+    ...p.map(x => ({ pattern:'price_manipulation', tag:'Price anomaly', who:x.ratio + 'x face price', text:x.reason, accounts:[] }))];
   renderList();
 }
 function renderList() {
   const rows = cases.filter(x => pattern === 'all' || x.pattern === pattern);
-  $('#list').innerHTML = rows.length ? rows.slice(0, 200).map((x, i) => `
+  $('#n-cases').textContent = rows.length ? `(${rows.length})` : '';
+  $('#list').innerHTML = rows.length ? rows.slice(0, 200).map(x => `
     <button class="case" data-i="${cases.indexOf(x)}" style="--tag:var(${COLORS[x.pattern]})">
-      <span class="tag">${x.tag}</span><span class="who mono">${esc(x.who)}</span><p>${esc(x.text)}</p></button>`).join('')
+      <div class="top"><span class="badge">${x.tag}</span><span class="who mono">${esc(x.who)}</span></div>
+      <p>${esc(x.text)}</p></button>`).join('')
     : '<div class="empty">Nothing flagged for this pattern.</div>';
 }
 $('#list').onclick = e => {
@@ -232,23 +234,25 @@ $('#list').onclick = e => {
   network.fit({ nodes: ids, animation: { duration: 500 }, maxZoomLevel: 1.6 });
 };
 
-/* ---------- graph ---------- */
 async function loadGraph() {
   const note = $('#gnote');
   if (pattern === 'price_manipulation') {
     note.style.display = 'flex';
-    note.textContent = 'Price spikes are single transactions, not connections, so there is nothing to draw. See the case list.';
+    note.textContent = 'Price anomalies are individual transactions rather than connections, so they are listed as cases instead of drawn on the map.';
     if (network) { network.destroy(); network = null; } return;
   }
   const g = await j('/fraud/graph?pattern=' + pattern);
   note.style.display = g.nodes.length ? 'none' : 'flex';
   note.textContent = 'No flagged accounts for this pattern.';
-  const col = { circular_resale:css('--stamp'), bot_ring:css('--ink-blue'), hub_account:css('--ochre') };
-  const nodes = g.nodes.map(n => ({ id:n.id, title:n.title, color:{ background:col[n.title.split('\n')[1]?.split(', ')[0]] || css('--muted'), border:css('--paper') } }));
+  const col = { circular_resale:css('--c-circ'), bot_ring:css('--c-bot'), hub_account:css('--c-hub') };
+  const nodes = g.nodes.map(n => {
+    const c = col[n.title.split('\n')[1]?.split(', ')[0]] || css('--c-price');
+    return { id:n.id, title:n.title, color:{ background:c, border:css('--card'), highlight:{ background:c, border:css('--text') } } };
+  });
   if (network) network.destroy();
   network = new vis.Network($('#net'), { nodes:new vis.DataSet(nodes), edges:new vis.DataSet(g.edges.map(e => ({ from:e.from, to:e.to, arrows:'to' }))) },
-    { nodes:{ shape:'dot', size:11, borderWidth:2 }, edges:{ smooth:false, width:1, color:{ color:css('--muted'), opacity:.55 }, arrows:{ to:{ scaleFactor:.4 } } },
-      physics:{ stabilization:{ iterations:180 }, barnesHut:{ springLength:60, gravitationalConstant:-2600 } },
+    { nodes:{ shape:'dot', size:12, borderWidth:2 }, edges:{ smooth:false, width:1, color:{ color:css('--muted'), opacity:.4 }, arrows:{ to:{ scaleFactor:.4 } } },
+      physics:{ stabilization:{ iterations:180 }, barnesHut:{ springLength:45, gravitationalConstant:-1400, centralGravity:1.1, damping:.5 } },
       interaction:{ hover:true, tooltipDelay:120 } });
 }
 
@@ -258,7 +262,6 @@ $('#tabs').onclick = e => {
   pattern = b.dataset.p; renderList(); loadGraph();
 };
 
-/* ---------- add-transaction dialog ---------- */
 const uuid = () => crypto.randomUUID ? crypto.randomUUID()
   : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c == 'x' ? r : (r & 3 | 8)).toString(16); });
 const dlg = $('#dlg'), msg = $('#msg');
@@ -282,19 +285,19 @@ $('#txform').onsubmit = async e => {
   try {
     const tx = await post(body), s = await sync();
     const ratio = body.purchase_price ? (body.resale_price / body.purchase_price).toFixed(1) : '-';
-    msg.innerHTML = `Saved <b class="mono">${short(tx.transaction_id)}</b> to Cassandra, synced ${s.synced} record(s) to Neo4j. Resale is ${ratio}x the original price.`;
+    msg.innerHTML = `Saved <b class="mono">${short(tx.transaction_id)}</b> to Cassandra and synced ${s.synced} record(s) to Neo4j. Resale price is ${ratio}x the original.`;
     refresh();
   } catch (err) { msg.textContent = 'Error: ' + err.message; }
 };
-$('#p-spike').onclick = () => { const f = $('#txform'); f.purchase_price.value = 100; f.resale_price.value = 500; f.transaction_type.value = 'Resale'; msg.textContent = 'Filled: 100 -> 500. Press Save & analyse.'; };
+$('#p-spike').onclick = () => { const f = $('#txform'); f.purchase_price.value = 100; f.resale_price.value = 500; f.transaction_type.value = 'Resale'; msg.textContent = 'Prices set to 100 and 500. Select Save and analyse.'; };
 $('#p-ring').onclick = async () => {
-  msg.textContent = 'Creating a 3-account ring passing one ticket around...';
+  msg.textContent = 'Creating three accounts that pass one ticket in a loop...';
   const A = uuid(), B = uuid(), C = uuid(), T = uuid(), E = uuid();
   try {
     for (const [s, b] of [[A, B], [B, C], [C, A]])
       await post({ event_id:E, ticket_id:T, buyer_id:b, seller_id:s, purchase_price:100, resale_price:105, transaction_type:'Resale' });
     const s = await sync();
-    msg.textContent = `Ring created (${s.synced} records synced). Circular resales should rise by one; look for it in the case list.`;
+    msg.textContent = `Loop created (${s.synced} records synced). Circular resales should increase by one; find it in the case list.`;
     refresh();
   } catch (err) { msg.textContent = 'Error: ' + err.message; }
 };
