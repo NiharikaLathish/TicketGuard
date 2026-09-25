@@ -6,136 +6,161 @@
 <title>TicketGuard | Fraud Monitoring</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
   :root {
-    --bg:#f5f6f8; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e8eaee;
-    --primary:#2563eb; --primary-ink:#ffffff; --shadow:0 1px 2px rgba(15,23,42,.05), 0 1px 3px rgba(15,23,42,.04);
-    --c-circ:#dc2626; --c-bot:#0d9488; --c-hub:#d97706; --c-price:#64748b; --ok:#16a34a; --bad:#dc2626;
-    --font:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --mono:ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#0b1120; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --line:#1f2937;
-            --primary:#3b82f6; --shadow:none; --c-circ:#f87171; --c-bot:#2dd4bf; --c-hub:#fbbf24; --c-price:#94a3b8; --ok:#4ade80; --bad:#f87171; }
+    --card:#262626; --text:#efeae0; --muted:#9b978e; --line:rgba(239,234,224,.16);
+    --c-circ:#f0938b; --c-bot:#b9d39a; --c-hub:#f2d98a; --c-price:#a8a39a;
+    --grad:linear-gradient(90deg,#c9d99e 0%,#efd2a6 55%,#f2a6a0 100%);
+    --ok:#b9d39a; --bad:#f0938b;
+    --font:"Outfit", "Segoe UI", system-ui, sans-serif;
+    --mono:ui-monospace, "Cascadia Mono", Consolas, monospace;
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 var(--font); -webkit-font-smoothing:antialiased; }
+  body { margin:0; min-height:100vh; padding:28px 20px 40px; color:var(--text); font:300 15px/1.6 var(--font);
+         background:linear-gradient(135deg,#b7d3a2 0%,#efb9b0 52%,#fbeab8 100%) fixed; }
   button { font:inherit; color:inherit; cursor:pointer; }
   .num { font-variant-numeric:tabular-nums; }
-  .mono { font-family:var(--mono); font-size:12px; }
+  .mono { font-family:var(--mono); font-size:11.5px; }
 
-  /* top bar */
-  .nav { background:var(--card); border-bottom:1px solid var(--line); }
-  .nav-in { max-width:1280px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; gap:20px; }
-  .brand { font-weight:700; font-size:17px; letter-spacing:-.01em; display:flex; align-items:center; gap:9px; }
-  .logo { width:26px; height:26px; border-radius:7px; background:var(--primary); display:grid; place-items:center; }
-  .logo svg { width:15px; height:15px; fill:none; stroke:#fff; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-  .grow { flex:1; }
-  .pill { display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border:1px solid var(--line); border-radius:999px; font-size:12.5px; color:var(--muted); }
-  .pill b { color:var(--text); font-weight:600; }
-  .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+  /* the dark window */
+  .frame { max-width:1240px; margin:0 auto; border-radius:6px; padding:0 52px 44px;
+           background:radial-gradient(120% 90% at 70% 0%, #3a3a3a 0%, #232323 55%, #1a1a1a 100%);
+           box-shadow:0 30px 60px rgba(60,40,40,.28), 0 7px 0 #e7c9ad; }
+
+  /* nav */
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:28px 0 8px; }
+  .mark { width:26px; height:26px; }
+  .links { display:flex; gap:34px; }
+  .links a { color:var(--text); text-decoration:none; font-size:12px; letter-spacing:.14em; text-transform:uppercase; font-weight:400; opacity:.85; }
+  .links a:hover { opacity:1; color:var(--c-bot); }
+  .btn { background:transparent; color:var(--text); border:1px solid var(--text); border-radius:2px; padding:8px 18px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; font-weight:400; }
+  .btn:hover { background:var(--text); color:#1d1d1d; }
+  .btn.sm { padding:6px 12px; letter-spacing:.08em; font-size:11px; }
+
+  /* hero */
+  .hero { display:grid; grid-template-columns:1.1fr 1fr; gap:30px; align-items:center; padding:46px 0 34px; }
+  h1 { margin:0 0 20px; font-weight:400; font-size:clamp(44px,6.4vw,78px); line-height:1.02; letter-spacing:-.01em;
+       background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero p { max-width:470px; margin:0 0 26px; color:var(--muted); font-size:14px; }
+  .hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
+  .orbit { position:relative; height:290px; display:grid; place-items:center; }
+  .orbit svg { position:absolute; inset:0; width:100%; height:100%; }
+  .focal { position:relative; text-align:center; }
+  .focal b { display:block; font-weight:300; font-size:82px; line-height:1; background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .focal span { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .facts { position:absolute; right:0; bottom:6px; text-align:right; font-size:13px; line-height:1.5; }
+  .facts b { font-weight:500; font-size:15px; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--muted); margin-right:7px; vertical-align:1px; }
   .dot.up { background:var(--ok); } .dot.down { background:var(--bad); }
-  .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; border:1px solid transparent; background:var(--primary); color:var(--primary-ink); font-weight:600; font-size:13.5px; }
-  .btn:hover { filter:brightness(1.08); }
-  .btn.sec { background:var(--card); color:var(--text); border-color:var(--line); font-weight:500; }
-  .btn.sec:hover { background:var(--bg); filter:none; }
 
-  .page { max-width:1280px; margin:0 auto; padding:26px 24px 60px; }
-  .head h1 { font-size:22px; font-weight:700; letter-spacing:-.015em; margin:0; }
-  .head p { margin:4px 0 0; color:var(--muted); }
-
-  /* KPI cards */
-  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:20px 0; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
-  .kpi { padding:16px 18px; }
-  .kpi .lbl { color:var(--muted); font-size:12.5px; font-weight:500; display:flex; align-items:center; gap:8px; }
+  /* KPIs */
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:8px 0 34px; }
+  .kpi { border:1px solid var(--line); border-radius:3px; padding:16px 18px; }
+  .kpi .lbl { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; }
   .kpi .lbl i { width:8px; height:8px; border-radius:50%; background:var(--c); }
-  .kpi .val { font-size:32px; font-weight:700; letter-spacing:-.02em; margin-top:6px; line-height:1.1; }
-  .kpi .sub { color:var(--muted); font-size:12.5px; margin-top:4px; }
+  .kpi .val { font-size:44px; font-weight:300; line-height:1.1; margin-top:8px; color:var(--c); }
+  .kpi .sub { color:var(--muted); font-size:12.5px; }
 
-  /* main */
-  .grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(340px,1fr); gap:16px; align-items:start; }
-  .card-h { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; flex-wrap:wrap; }
-  .card-h h2 { margin:0; font-size:15px; font-weight:600; }
-  .seg { display:inline-flex; background:var(--bg); border-radius:9px; padding:3px; gap:2px; flex-wrap:wrap; }
-  .seg button { background:none; border:0; padding:5px 11px; border-radius:7px; color:var(--muted); font-size:12.5px; font-weight:500; }
+  /* sections */
+  .grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  .panel { border:1px solid var(--line); border-radius:3px; background:rgba(255,255,255,.02); }
+  .panel-h { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; flex-wrap:wrap; }
+  .panel-h h2 { margin:0; font-size:12px; letter-spacing:.16em; text-transform:uppercase; font-weight:500; }
+  .count { color:var(--muted); font-weight:300; letter-spacing:0; }
+  .seg { display:flex; gap:18px; flex-wrap:wrap; }
+  .seg button { background:none; border:0; border-bottom:1px solid transparent; padding:2px 0; color:var(--muted); font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
   .seg button:hover { color:var(--text); }
-  .seg button.on { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(15,23,42,.12); }
-  .canvas { position:relative; height:520px; border-top:1px solid var(--line); overflow:hidden; }
+  .seg button.on { color:var(--text); border-color:var(--c-bot); }
+  .canvas { position:relative; height:520px; border-top:1px solid var(--line); }
   #net { position:absolute; inset:0; }
   .note { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:32px; color:var(--muted); }
-  .legend { display:flex; gap:16px; padding:11px 18px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; flex-wrap:wrap; }
-  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .legend { display:flex; gap:18px; padding:12px 20px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
 
-  /* case list */
-  .list { max-height:600px; overflow:auto; border-top:1px solid var(--line); }
-  .case { display:block; width:100%; text-align:left; background:none; border:0; padding:13px 18px; border-bottom:1px solid var(--line); }
+  .list { max-height:590px; overflow:auto; border-top:1px solid var(--line); }
+  .list::-webkit-scrollbar { width:6px; } .list::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px; }
+  .case { display:block; width:100%; text-align:left; background:none; border:0; padding:14px 20px; border-bottom:1px solid var(--line); }
   .case:last-child { border-bottom:0; }
-  .case:hover { background:var(--bg); }
-  .case.sel { background:color-mix(in srgb, var(--primary) 8%, transparent); }
+  .case:hover { background:rgba(255,255,255,.04); }
+  .case.sel { background:rgba(185,211,154,.09); }
   .case .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-  .badge { font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:6px; color:var(--tag); background:color-mix(in srgb, var(--tag) 12%, transparent); }
+  .badge { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; padding:2px 9px; border:1px solid var(--tag); color:var(--tag); border-radius:2px; }
   .case .who { color:var(--muted); }
-  .case p { margin:6px 0 0; color:var(--text); font-size:13px; line-height:1.45; }
-  .empty { padding:28px 18px; color:var(--muted); }
-  .count { color:var(--muted); font-weight:500; font-size:13px; }
-
-  .foot { margin-top:26px; color:var(--muted); font-size:12.5px; }
+  .case p { margin:8px 0 0; font-size:13px; line-height:1.5; color:var(--text); opacity:.9; }
+  .empty { padding:28px 20px; color:var(--muted); }
+  .foot { margin-top:30px; color:var(--muted); font-size:12px; display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
 
   /* dialog */
-  dialog { border:0; border-radius:14px; background:var(--card); color:var(--text); padding:0; width:min(620px, calc(100vw - 32px)); box-shadow:0 20px 50px rgba(15,23,42,.3); }
-  dialog::backdrop { background:rgba(15,23,42,.5); }
-  .dlg-h { display:flex; justify-content:space-between; align-items:center; padding:18px 22px 4px; }
-  .dlg-h h3 { margin:0; font-size:17px; font-weight:600; }
-  .x { background:none; border:0; font-size:22px; line-height:1; color:var(--muted); padding:2px 6px; border-radius:6px; }
-  .x:hover { background:var(--bg); }
-  .dlg-sub { padding:0 22px; margin:0; color:var(--muted); }
-  .dlg-b { padding:14px 22px 22px; }
-  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-  .presets .btn { font-size:12.5px; padding:6px 11px; }
-  form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  label { display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:500; color:var(--muted); }
-  input, select { font:13px var(--font); padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+  dialog { border:1px solid var(--line); border-radius:4px; background:#232323; color:var(--text); padding:0; width:min(620px, calc(100vw - 32px)); box-shadow:0 30px 60px rgba(0,0,0,.5); }
+  dialog::backdrop { background:rgba(20,15,15,.6); }
+  .dlg-h { display:flex; justify-content:space-between; align-items:center; padding:22px 26px 4px; }
+  .dlg-h h3 { margin:0; font-weight:400; font-size:22px; background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .x { background:none; border:0; font-size:26px; line-height:1; color:var(--muted); }
+  .dlg-sub { padding:0 26px; margin:0; color:var(--muted); font-size:13px; }
+  .dlg-b { padding:16px 26px 26px; }
+  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  label { display:flex; flex-direction:column; gap:6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  input, select { font:300 14px var(--font); letter-spacing:0; text-transform:none; padding:10px 11px; border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--text); }
   input.id { font-family:var(--mono); font-size:12px; }
-  input:focus, select:focus { outline:2px solid color-mix(in srgb, var(--primary) 40%, transparent); border-color:var(--primary); }
+  select option { background:#232323; }
+  input:focus, select:focus { outline:0; border-color:var(--c-bot); }
   #msg { margin:14px 0 0; font-size:13px; min-height:18px; color:var(--muted); }
 
   @media (max-width:980px) {
+    .frame { padding:0 22px 30px; } .links { display:none; }
+    .hero { grid-template-columns:1fr; } .orbit { height:250px; } .facts { position:static; margin-top:8px; text-align:center; }
     .kpis { grid-template-columns:repeat(2,1fr); } .grid { grid-template-columns:1fr; }
-    .pill.hide-m { display:none; } form { grid-template-columns:1fr; } .canvas { height:400px; }
+    form { grid-template-columns:1fr; } .canvas { height:400px; }
   }
 </style>
 </head>
 <body>
-<header class="nav"><div class="nav-in">
-  <div class="brand">
-    <span class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
-    TicketGuard
-  </div>
-  <div class="grow"></div>
-  <span class="pill hide-m"><i class="dot" id="d-c"></i>Cassandra <b class="num" id="f-tx">&ndash;</b> transactions</span>
-  <span class="pill hide-m"><i class="dot" id="d-n"></i>Neo4j <b class="num" id="f-acc">&ndash;</b> accounts</span>
-  <button class="btn" id="open">Log transaction</button>
-</div></header>
+<div class="frame">
+  <header class="nav">
+    <svg class="mark" viewBox="0 0 26 26" fill="none" stroke="#efeae0" stroke-width="1.3"><circle cx="13" cy="13" r="11.5"/><circle cx="13" cy="13" r="7"/><circle cx="13" cy="13" r="2.6" fill="#efeae0"/></svg>
+    <nav class="links">
+      <a href="#top">Overview</a><a href="#map">Map</a><a href="#cases">Cases</a><a href="/docs" target="_blank" rel="noopener">API</a>
+    </nav>
+    <button class="btn" id="open">Log transaction</button>
+  </header>
 
-<main class="page">
-  <div class="head">
-    <h1>Fraud monitoring</h1>
-    <p>Resale activity analysed as a network of accounts and tickets.</p>
-  </div>
+  <section class="hero" id="top">
+    <div>
+      <h1>Fraud never<br>stays hidden.</h1>
+      <p>TicketGuard watches ticket resale as a network of accounts. Transactions live in Cassandra; the connections between accounts live in Neo4j, where loops, bot groups and hubs become visible.</p>
+      <div class="hero-actions">
+        <a class="btn" href="#cases" style="text-decoration:none;display:inline-block">View cases</a>
+      </div>
+    </div>
+    <div class="orbit">
+      <svg viewBox="0 0 420 290" fill="none" aria-hidden="true">
+        <ellipse cx="210" cy="145" rx="185" ry="70" transform="rotate(-18 210 145)" stroke="#efd2a6" stroke-opacity=".55" stroke-width="1.2"/>
+        <ellipse cx="210" cy="145" rx="150" ry="52" transform="rotate(14 210 145)" stroke="#c9d99e" stroke-opacity=".5" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle cx="52" cy="98" r="7" fill="#f0938b"/><circle cx="366" cy="196" r="10" stroke="#f2a6a0" stroke-width="1.3"/>
+        <path d="M330 60l10 10-10 10-10-10z" fill="#f2d98a" fill-opacity=".85"/><path d="M96 220l14 4-10 8z" fill="#b9d39a"/>
+        <path d="M382 92v14M375 99h14" stroke="#efeae0" stroke-width="1.3"/>
+      </svg>
+      <div class="focal"><b class="num" id="s-flag">&ndash;</b><span>accounts flagged</span></div>
+      <div class="facts">
+        <div><i class="dot" id="d-c"></i><b class="num" id="f-tx">&ndash;</b> transactions &middot; Cassandra</div>
+        <div><i class="dot" id="d-n"></i><b class="num" id="f-acc">&ndash;</b> accounts &middot; Neo4j</div>
+      </div>
+    </div>
+  </section>
 
   <section class="kpis">
-    <div class="card kpi" style="--c:var(--c-circ)"><div class="lbl"><i></i>Circular resales</div><div class="val num" id="s-cyc">&ndash;</div><div class="sub">tickets returning to the seller</div></div>
-    <div class="card kpi" style="--c:var(--c-bot)"><div class="lbl"><i></i>Bot rings</div><div class="val num" id="s-bot">&ndash;</div><div class="sub">coordinated account groups</div></div>
-    <div class="card kpi" style="--c:var(--c-hub)"><div class="lbl"><i></i>Hub accounts</div><div class="val num" id="s-hub">&ndash;</div><div class="sub">unusually connected traders</div></div>
-    <div class="card kpi" style="--c:var(--c-price)"><div class="lbl"><i></i>Price anomalies</div><div class="val num" id="s-pri">&ndash;</div><div class="sub"><span class="num" id="s-flag">&ndash;</span> accounts flagged overall</div></div>
+    <div class="kpi" style="--c:var(--c-circ)"><div class="lbl"><i></i>Circular resales</div><div class="val num" id="s-cyc">&ndash;</div><div class="sub">tickets returning to the seller</div></div>
+    <div class="kpi" style="--c:var(--c-bot)"><div class="lbl"><i></i>Bot rings</div><div class="val num" id="s-bot">&ndash;</div><div class="sub">coordinated account groups</div></div>
+    <div class="kpi" style="--c:var(--c-hub)"><div class="lbl"><i></i>Hub accounts</div><div class="val num" id="s-hub">&ndash;</div><div class="sub">unusually connected traders</div></div>
+    <div class="kpi" style="--c:var(--c-price)"><div class="lbl"><i></i>Price anomalies</div><div class="val num" id="s-pri">&ndash;</div><div class="sub">resold at 2x or more</div></div>
   </section>
 
   <div class="grid">
-    <section class="card">
-      <div class="card-h">
+    <section class="panel" id="map">
+      <div class="panel-h">
         <h2>Relationship map</h2>
         <div class="seg" id="tabs">
           <button data-p="all" class="on">All</button>
@@ -154,23 +179,26 @@
       </div>
     </section>
 
-    <section class="card">
-      <div class="card-h"><h2>Flagged cases <span class="count num" id="n-cases"></span></h2></div>
+    <section class="panel" id="cases">
+      <div class="panel-h"><h2>Flagged cases <span class="count num" id="n-cases"></span></h2></div>
       <div class="list" id="list"></div>
     </section>
   </div>
 
-  <p class="foot">Synthetic data. Detection uses graph analysis (cycle search, Louvain community detection, degree centrality) and price rules, with no machine learning.</p>
-</main>
+  <div class="foot">
+    <span>Synthetic data. Cycle search, Louvain communities, degree centrality and price rules, no machine learning.</span>
+    <span>BCSE406L &middot; NoSQL Databases</span>
+  </div>
+</div>
 
 <dialog id="dlg">
   <div class="dlg-h"><h3>Log a transaction</h3><button class="x" id="close" type="button" aria-label="Close">&times;</button></div>
   <p class="dlg-sub">Saved to Cassandra, synced to Neo4j, then detection re-runs.</p>
   <div class="dlg-b">
     <div class="presets">
-      <button class="btn sec" type="button" id="p-spike">Example: 5x price spike</button>
-      <button class="btn sec" type="button" id="p-ring">Run circular-resale demo</button>
-      <button class="btn sec" type="button" id="p-undo">Undo added transactions</button>
+      <button class="btn sm" type="button" id="p-spike">Example: 5x price spike</button>
+      <button class="btn sm" type="button" id="p-ring">Run circular-resale demo</button>
+      <button class="btn sm" type="button" id="p-undo">Undo added</button>
     </div>
     <form id="txform">
       <label>Buyer ID<input class="id" name="buyer_id" placeholder="Auto-generate"></label>
@@ -180,7 +208,7 @@
       <label>Original price<input name="purchase_price" type="number" min="0" step="0.01" value="100" required></label>
       <label>Resale price<input name="resale_price" type="number" min="0" step="0.01" value="105" required></label>
       <label>Type<select name="transaction_type"><option>Resale</option><option>Purchase</option><option>Transfer</option></select></label>
-      <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%;justify-content:center">Save and analyse</button></div>
+      <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%">Save and analyse</button></div>
     </form>
     <p id="msg"></p>
   </div>
@@ -251,7 +279,7 @@ async function loadGraph() {
   });
   if (network) network.destroy();
   network = new vis.Network($('#net'), { nodes:new vis.DataSet(nodes), edges:new vis.DataSet(g.edges.map(e => ({ from:e.from, to:e.to, arrows:'to' }))) },
-    { nodes:{ shape:'dot', size:12, borderWidth:2 }, edges:{ smooth:false, width:1, color:{ color:css('--muted'), opacity:.4 }, arrows:{ to:{ scaleFactor:.4 } } },
+    { nodes:{ shape:'dot', size:12, borderWidth:2 }, edges:{ smooth:false, width:1, color:{ color:css('--muted'), opacity:.45 }, arrows:{ to:{ scaleFactor:.4 } } },
       physics:{ stabilization:{ iterations:180 }, barnesHut:{ springLength:45, gravitationalConstant:-1400, centralGravity:1.1, damping:.5 } },
       interaction:{ hover:true, tooltipDelay:120 } });
 }
