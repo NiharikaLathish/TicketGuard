@@ -185,7 +185,7 @@ table(["Pattern", "Method", "Explanation produced"], [
 ], [3.2, 7.2, 6.0])
 doc.add_heading("4.5 Backend API and visualisation", 2)
 para("The FastAPI service exposes 20 endpoints with automatic Swagger documentation at /docs (full list in the API "
-     "documentation). A browser console at / shows summary counts, a colour-coded graph of detected rings, and a table of "
+     "documentation). A browser console at / has a form to add a transaction (saved to Cassandra, synced to Neo4j, detection re-run), summary counts, a colour-coded graph of detected rings, and a table of "
      "reasons.")
 para("[Insert screenshot of the fraud console here]", italic=True, align=WD_ALIGN_PARAGRAPH.CENTER)
 
@@ -194,7 +194,7 @@ doc.add_heading("5. Results", 1)
 doc.add_heading("5.1 Data volumes", 2)
 table(["Store", "Contents"], [
     ["Cassandra", "50,000 transactions in each of 4 tables (200,000 rows)"],
-    ["Neo4j", "8,484 accounts, 46,132 tickets, 62 events, 50,000 transactions, 249,937 relationships "
+    ["Neo4j", "8,480 accounts (incl. 1 platform account), 46,130 tickets, 60 events, 50,000 transactions, 249,931 relationships "
               "(3,870 TRANSFERRED_TO)"],
 ], [3.4, 13.0])
 doc.add_heading("5.2 Detection accuracy against ground truth", 2)

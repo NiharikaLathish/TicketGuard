@@ -5,7 +5,7 @@
   "true_positives": 98,
   "precision": 1.0,
   "recall": 1.0,
-  "seconds": 0.09
+  "seconds": 0.1
  },
  "bot_ring": {
   "expected": 66,
@@ -13,7 +13,7 @@
   "true_positives": 66,
   "precision": 1.0,
   "recall": 1.0,
-  "seconds": 1.53
+  "seconds": 1.99
  },
  "hub_account": {
   "expected": 5,

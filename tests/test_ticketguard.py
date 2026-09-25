@@ -89,7 +89,10 @@ def test_sync_propagates_new_transaction_and_delete(client):
     assert hist.json()["transfers"][0]["to"] == body["buyer_id"]
     assert client.post("/sync").json()["synced"] == 0  # idempotent: nothing new
     client.delete(f"/transactions/{tid}")
-    assert client.get(f"/tickets/{body['ticket_id']}/history").json()["transfers"] == []
+    # deleting the only transaction leaves no orphan ticket or accounts in the graph
+    assert client.get(f"/tickets/{body['ticket_id']}/history").status_code == 404
+    assert client.get(f"/accounts/{body['buyer_id']}").status_code == 404
+    assert client.get(f"/accounts/{body['seller_id']}").status_code == 404
 
 
 # ------------------------------------------------ fraud detection vs. ground truth

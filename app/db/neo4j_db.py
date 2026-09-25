@@ -88,8 +88,31 @@ def upsert_transactions(rows: list[dict]) -> int:
 
 
 def delete_transaction(tx_id: str):
+    """Remove a transaction from the graph, plus any edges/nodes that only it justified."""
+    info = run("""MATCH (x:Transaction {transaction_id:$id})-[:INVOLVES]->(t:Ticket), (x)-[:MADE_BY]->(b:Account)
+                  OPTIONAL MATCH (s:Account)-[:TRANSFERRED_TO {tx_id:$id}]->(b)
+                  RETURN t.ticket_id AS t, b.account_id AS b, s.account_id AS s""", id=tx_id)
     run("MATCH (x:Transaction {transaction_id:$id}) DETACH DELETE x", id=tx_id)
     run("MATCH ()-[r:TRANSFERRED_TO {tx_id:$id}]->() DELETE r", id=tx_id)
+    if not info:
+        return
+    t, b, s = info[0]["t"], info[0]["b"], info[0]["s"] or config.PLATFORM_ACCOUNT_ID
+    run("""MATCH (b:Account {account_id:$b})-[p:PURCHASED]->(t:Ticket {ticket_id:$t})
+           WHERE NOT EXISTS { MATCH (x:Transaction)-[:MADE_BY]->(b) WHERE (x)-[:INVOLVES]->(t) }
+           DELETE p""", b=b, t=t)
+    run("""MATCH (s:Account {account_id:$s})-[o:SOLD]->(t:Ticket {ticket_id:$t})
+           WHERE NOT EXISTS { MATCH (s)-[:TRANSFERRED_TO {ticket_id:$t}]->() }
+             AND NOT EXISTS { MATCH (x:Transaction {transaction_type:'Purchase'})-[:INVOLVES]->(t) WHERE s.is_platform }
+           DELETE o""", s=s, t=t)
+    run("""MATCH (t:Ticket {ticket_id:$t}) WHERE NOT EXISTS { MATCH (:Transaction)-[:INVOLVES]->(t) }
+           DETACH DELETE t""", t=t)
+    run("MATCH (e:Event) WHERE NOT EXISTS { MATCH (e)<-[:BELONGS_TO]-() } DETACH DELETE e")
+    run("""MATCH (a:Account) WHERE a.account_id IN [$b, $s] AND NOT coalesce(a.is_platform, false)
+             AND a.name IS NULL
+             AND NOT EXISTS { MATCH (:Transaction)-[:MADE_BY]->(a) }
+             AND NOT EXISTS { MATCH (a)-[:TRANSFERRED_TO]-() }
+             AND NOT EXISTS { MATCH (a)-[:PURCHASED|SOLD]->(:Ticket) }
+           DETACH DELETE a""", b=b, s=s)
 
 
 # ---------------------------------------------------------------- sync state

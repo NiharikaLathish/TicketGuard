@@ -23,12 +23,29 @@
   table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
   th { color:var(--muted); font-weight:600; }
+  label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
+  input, select { font:inherit; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin:0 4px 0 12px; }
 </style>
 </head>
 <body>
 <header><h1>TicketGuard Fraud Console</h1><p>Cassandra transactions &rarr; Neo4j graph &rarr; detected fraud rings</p></header>
 <main>
+  <section class="card" style="padding:14px">
+    <b style="font-size:16px">Add a transaction</b>
+    <span>Saved to Cassandra, synced to Neo4j, then detection re-runs. Leave an ID blank to auto-generate it.</span>
+    <form id="txform" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">
+      <label>Buyer ID<input name="buyer_id" placeholder="auto"></label>
+      <label>Seller ID<input name="seller_id" placeholder="auto"></label>
+      <label>Ticket ID<input name="ticket_id" placeholder="auto"></label>
+      <label>Event ID<input name="event_id" placeholder="auto"></label>
+      <label>Original price<input name="purchase_price" type="number" min="0" step="0.01" value="100" required></label>
+      <label>Resale price<input name="resale_price" type="number" min="0" step="0.01" value="500" required></label>
+      <label>Type<select name="transaction_type"><option>Resale</option><option>Purchase</option><option>Transfer</option></select></label>
+      <div style="display:flex;align-items:end"><button class="on" type="submit">Add &amp; analyse</button></div>
+    </form>
+    <p id="txmsg" style="margin:10px 0 0;font-size:13px"></p>
+  </section>
   <section class="cards" id="cards"></section>
   <section class="toolbar">
     <button data-p="all" class="on">All</button>
@@ -72,6 +89,29 @@ document.querySelectorAll('.toolbar button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.toolbar button').forEach(x => x.classList.remove('on'));
   b.classList.add('on'); loadGraph(b.dataset.p);
 });
+const uuid = () => crypto.randomUUID ? crypto.randomUUID()
+  : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c == 'x' ? r : (r & 3 | 8)).toString(16); });
+
+function refresh() { loadSummary(); loadGraph(document.querySelector('.toolbar button.on').dataset.p); loadTable(); }
+
+$('#txform').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target), msg = $('#txmsg');
+  const body = { transaction_type: f.get('transaction_type'),
+    purchase_price: parseFloat(f.get('purchase_price')), resale_price: parseFloat(f.get('resale_price')) };
+  ['buyer_id', 'seller_id', 'ticket_id', 'event_id'].forEach(k => body[k] = (f.get(k) || '').trim() || uuid());
+  msg.textContent = 'Saving...';
+  const r = await fetch('/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { msg.textContent = 'Error: ' + JSON.stringify((await r.json()).detail); return; }
+  const tx = await r.json();
+  const s = await (await fetch('/sync', { method: 'POST' })).json();
+  msg.innerHTML = `Saved transaction <b>${short(tx.transaction_id)}</b> to Cassandra and synced ${s.synced} record(s) to Neo4j. `
+    + `Ratio ${(body.resale_price / (body.purchase_price || 1)).toFixed(1)}x face price. `
+    + `<a href="#" id="undo">Undo (delete)</a>`;
+  $('#undo').onclick = async ev => { ev.preventDefault(); await fetch('/transactions/' + tx.transaction_id, { method: 'DELETE' }); msg.textContent = 'Deleted.'; refresh(); };
+  refresh();
+};
+
 loadSummary(); loadGraph('all'); loadTable();
 </script>
 </body>
