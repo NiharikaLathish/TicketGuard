@@ -21,6 +21,7 @@ uvicorn app.main:app --reload              # API docs: http://localhost:8000/doc
 
 Open http://localhost:8000/ for the fraud console (graph of detected rings and the reasons they were flagged).
 Open http://localhost:8000/demo for the step-by-step live demo: it runs a scenario one command at a time, shows the exact CQL and Cypher that reach Cassandra and Neo4j, and draws the graph as it grows (script: `docs/DEMO_SCRIPT.md`).
+Open http://localhost:8000/live for the live feed: type a transaction (or send one from Swagger) and the commands, counters and graph update by themselves within a second or two.
 
 Evaluation vs. ground truth: `python -m scripts.evaluate`
 
@@ -39,7 +40,7 @@ Database dump: `python -m scripts.dump` (writes to `dumps/`).
 | `app/detection.py` | Cycles, community detection, hub centrality, pricing anomalies |
 | `app/main.py` | FastAPI endpoints (see `docs/API.md`) |
 | `generator/generate.py` | Synthetic data with labelled fraud patterns |
-| `static/index.html`, `static/demo.html` | Fraud console and live demo page |
+| `static/index.html`, `static/demo.html`, `static/live.html` | Fraud console, scripted live demo and live feed pages |
 | `tests/` | pytest integration tests (19), including detection recall/precision vs. ground truth |
 | `docs/` | API reference, `queries.md` (CQL and Cypher showcase with real output), `test_plan.md`, progress report |
 | `dumps/` | Sample dataset, ground truth, database exports |

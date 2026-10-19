@@ -8,11 +8,11 @@ the **steps** on the left, the **graph** read back from Neo4j on the right, and 
 
 1. Start Docker Desktop, then in the project folder: `docker compose up -d`. Wait about 2 minutes (Neo4j is slow to start).
 2. `.venv\Scripts\activate`, then `uvicorn app.main:app`. Leave that window open.
-3. Open two browser tabs: http://localhost:8000/ (console) and http://localhost:8000/demo (live demo).
+3. Open three browser tabs: http://localhost:8000/ (console), http://localhost:8000/demo (scripted demo) and http://localhost:8000/live (live feed).
    Both pages load their fonts and the graph library from the internet, so check the connection.
 4. Optional, for the "show the real tools" part: open Neo4j Browser at http://localhost:7474 (user `neo4j`, password `ticketguard123`)
    and a terminal running `docker exec -it ticketguard-cassandra cqlsh` followed by `USE ticketguard;`.
-5. Do one dry run: press **Run all**, then **Start over**. The four numbers must return to 50,000 / 8,480 / 3,870 / 69.
+5. Do one dry run: on `/demo` press **Run all**, then **Start over**; on `/live` send two transactions, then **Clear session**. The four numbers must return to 50,000 / 8,480 / 3,870 / 69.
 
 ## 1. The console (1 minute)
 
@@ -55,13 +55,31 @@ Click the **Price spike** tab and press **Run all**. "Here the graph looks ordin
 price: 500 against a face value of 100. That is a different detector, a rule on the price ratio." Anomalies go from 150 to 151.
 Press **Start over** again.
 
-## 4. Close (1 minute)
+## 4. Live feed: type anything and watch it land (3 minutes)
+
+Open http://localhost:8000/live. This page listens by itself: there is no "next" button. It checks for new commands every
+second, copies new Cassandra rows into Neo4j as soon as it sees them, and redraws the graph from Neo4j.
+
+- **Type a transaction** (From, To, Ticket, prices) and press **Send**. Within a second or two you see: the API request, the four
+  CQL INSERTs, an automatic sync, the Neo4j MERGE. The counters change and the graph redraws.
+- **Use names.** The same name is always the same account. With ticket `T1`: Alice buys (leave From blank), Alice to Bob,
+  Bob to Carol, Carol to Alice. When Carol sells it back, the loop turns red, "Detected" appears and *Loops flagged* goes from 69 to 70.
+- **Let the panel pick the input.** Ask for any names and prices and type them in. Try a resale at 5 times the price: the
+  *Price anomalies* counter goes from 150 to 151.
+- **Show input from somewhere else.** Open Swagger (http://localhost:8000/docs) in another window, run `POST /transactions` with
+  the example body from `docs/API.md`, and do not touch the live page. It shows `POST /transactions (from Swagger)`, the commands,
+  and the graph updates on its own. (Swagger uses long ids, so those accounts are labelled with the first 6 characters.)
+- **Clear session** removes everything sent since the page opened, from both databases. Reloading the page also starts clean.
+
+## 5. Close (1 minute)
 
 - "All four detectors found every planted case, and each result explains itself. The data is synthetic, so those perfect scores
   show the detectors work, not how they would perform on real data. Review 3 adds noisier cases."
 - If asked, run `pytest -q` (19 tests, plus the demo tests).
 
 ## Questions you may get
+
+- **Is it really real time?** The live page checks for new commands every second, syncs Cassandra to Neo4j as soon as it sees a new write, and redraws from Neo4j, so a change shows within about one to three seconds. The background sync (every 60 seconds) is the safety net.
 
 - **Why two databases?** Cassandra is built for fast writes and for reads along one key. Neo4j is built for following relationships.
   Loops and clusters are relationship questions, which are awkward in tables. Each store does the job it is best at.

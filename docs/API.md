@@ -66,3 +66,10 @@ Used by the live demo page at `/demo`. They are hidden from `/docs` so the publi
 | GET | `/commands?after=&limit=` | Recent CQL / Cypher / sync commands the app ran, with the id of the newest one |
 | GET | `/demo/graph?ticket_id=` | Every transfer of one ticket as stored in Neo4j (drawn on the demo page) |
 | POST | `/demo/reset` | Delete every transaction the demo created (labelled `fraud_pattern = 'demo'`) from both databases |
+| GET | `/live` | The live feed page |
+| GET | `/live/now` | Server time in milliseconds (the live page's starting point) |
+| POST | `/live/transaction` | Insert one transaction described with names: `seller` (blank = platform), `buyer`, `ticket`, `face`, `price`, `type`. The same name is always the same account |
+| GET | `/live/graph?since_ms=` | Every transaction stored since that time, read back from Neo4j, plus the names typed on the live page |
+| POST | `/live/clear?since_ms=` | Delete the transactions created since the live page opened, from both databases (refuses a start time older than 12 hours) |
+
+Writes sent from Swagger, the console or curl are also shown in the demo command log as `API  POST /... (from Swagger)`.
