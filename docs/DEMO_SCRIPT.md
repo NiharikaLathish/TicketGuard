@@ -1,86 +1,69 @@
-# Review 2 demo script (about 8 minutes)
+# Review 2 demo script (about 6 minutes)
 
-The live demo page (`/demo`) runs a scenario one step at a time. After each step you can point at three things:
-the **steps** on the left, the **graph** read back from Neo4j on the right, and the **commands** underneath
-(the exact API request, CQL and Cypher that ran).
+You only need **two pages**:
 
-## Before you start (do this 15 minutes early)
+| Page | Address | What it is for |
+|---|---|---|
+| **Console** | http://localhost:8000/ | The results: the numbers, the map of detected fraud, and the reason for every flagged case |
+| **Live feed** | http://localhost:8000/live | The input: type a transaction and watch the commands and the graph react |
+
+(There is also an older step-by-step page at `/demo`. You do not need it.)
+
+Both pages update by themselves, so anything entered on one shows up on the other without reloading.
+
+## Before you start (15 minutes early)
 
 1. Start Docker Desktop, then in the project folder: `docker compose up -d`. Wait about 2 minutes (Neo4j is slow to start).
 2. `.venv\Scripts\activate`, then `uvicorn app.main:app`. Leave that window open.
-3. Open three browser tabs: http://localhost:8000/ (console), http://localhost:8000/demo (scripted demo) and http://localhost:8000/live (live feed).
-   Both pages load their fonts and the graph library from the internet, so check the connection.
-4. Optional, for the "show the real tools" part: open Neo4j Browser at http://localhost:7474 (user `neo4j`, password `ticketguard123`)
-   and a terminal running `docker exec -it ticketguard-cassandra cqlsh` followed by `USE ticketguard;`.
-5. Do one dry run: on `/demo` press **Run all**, then **Start over**; on `/live` send two transactions, then **Clear session**. The four numbers must return to 50,000 / 8,480 / 3,870 / 69.
+3. Open the two pages in two browser windows side by side (Windows key + Left arrow for one, Right arrow for the other):
+   console on the left, live feed on the right. Both load fonts and the graph library from the internet, so check the connection.
+4. Check the live feed shows a green pulsing dot and the numbers **50,000 / 8,480 / 3,870 / 69 / 150**.
 
-## 1. The console (1 minute)
+## What to say first (10 seconds)
 
-Open http://localhost:8000/.
-- "Cassandra holds 50,000 synthetic transactions. Neo4j holds the same activity as a graph: 8,480 accounts, 46,130 tickets."
-- "The detectors found 69 circular resales, 6 bot rings, 5 hub accounts and 150 price anomalies. Every case has a reason."
-- Click a case in the list: the map zooms to that ring.
+"This system detects fraud in ticket resale. Cassandra stores the transactions, Neo4j stores how accounts are connected, and
+the graph shows fraud that single transactions cannot."
 
-## 2. Live demo: circular resale (3 minutes)
+## 1. The console (1 minute), left window
 
-Switch to the `/demo` tab. Note the four numbers at the top; they are the starting point.
+- "50,000 transactions in Cassandra, 8,480 accounts in Neo4j. The detectors found 69 circular resales, 6 bot rings, 5 hub
+  accounts and 150 price anomalies."
+- Click a case in the list: the map zooms to that ring, and every case has a reason.
 
-| Press | What happens | What to say |
-|---|---|---|
-| **Run first step** | Alice buys a ticket from the platform | "One API call. Look at the log: Cassandra gets four INSERTs, one per table, because each table answers a different question. Then the sync copies it into Neo4j with a MERGE, and the graph on the right is read back from Neo4j." |
-| **Run next step** (Alice to Bob) | A new arrow appears | "A normal resale. The Cassandra count and the Neo4j transfer count each go up by one. Nothing is flagged." |
-| **Run next step** (Bob to Carol) | The chain gets longer | "Still a chain." |
-| **Run next step** (Carol to Alice) | The chain closes into a red loop; **Detected** appears | "The ticket is back with the account that started it. The cycle query finds it and explains why. The circular-resale counter goes from 69 to 70." |
+## 2. Type a transaction and watch it land (3 minutes), right window
 
-Point at the log's colours: grey = API request, green = Cassandra, yellow = sync, blue = Neo4j, red = detection.
+Click each button, press **Send**, and wait about 3 seconds each time.
 
-**Optional: show the same thing in the real tools** (before you press Start over). In the log, find the line
-`GET /demo/graph?ticket_id=...` and copy the id. Then:
+| Click | What to say |
+|---|---|
+| **Alice buys a ticket**, then Send | "One transaction. In the log: the API request, four green Cassandra INSERTs (one per table, because Cassandra needs one table for each way we read the data), then the automatic sync, then the blue Neo4j command that builds the graph." |
+| **Alice to Bob**, then Send | "A new arrow. A normal resale, so nothing is flagged." |
+| **Bob to Carol**, then Send | "Still a chain." |
+| **Carol to Alice (closes the loop)**, then Send | "The ticket is back with Alice. The graph closes into a loop, turns red, and the system flags it and says why. Loops flagged goes from 69 to 70." |
 
-- In `cqlsh`:
-  ```sql
-  SELECT ts, seller_id, buyer_id, resale_price, transaction_type FROM transactions_by_ticket WHERE ticket_id = <paste id>;
-  ```
-- In Neo4j Browser:
-  ```cypher
-  MATCH p = (a:Account)-[:TRANSFERRED_TO*3..5 {ticket_id: '<paste id>'}]->(a) RETURN p LIMIT 1
-  ```
+Point at the counters: +4 transactions, +3 accounts, +3 transfers, +1 loop.
 
-Press **Start over**. This deletes only the demo's own transactions (labelled `demo`) from both databases;
-the 50,000 sample transactions are never touched.
+## 3. Everything updates (1 minute)
 
-## 3. Live demo: price spike (1 minute)
+Look at the console on the left. Without touching it, it has changed: **70** circular resales and **172** accounts flagged.
+"I did not reload anything. Anything entered anywhere updates every page."
 
-Click the **Price spike** tab and press **Run all**. "Here the graph looks ordinary: one edge. What gives it away is the
-price: 500 against a face value of 100. That is a different detector, a rule on the price ratio." Anomalies go from 150 to 151.
-Press **Start over** again.
+Then let ma'am choose: ask for any names and a price and type them in the live feed, or on the console click **Log transaction**,
+**Example: 5x price spike**, **Save and analyse**. The live feed picks it up by itself and shows
+`POST /transactions (from the console)` in the log. Price anomalies goes from 150 to 151.
 
-## 4. Live feed: type anything and watch it land (3 minutes)
+## 4. Clean up and close (1 minute)
 
-Open http://localhost:8000/live. This page listens by itself: there is no "next" button. It checks for new commands every
-second, copies new Cassandra rows into Neo4j as soon as it sees them, and redraws the graph from Neo4j.
-
-- **Type a transaction** (From, To, Ticket, prices) and press **Send**. Within a second or two you see: the API request, the four
-  CQL INSERTs, an automatic sync, the Neo4j MERGE. The counters change and the graph redraws.
-- **Use names.** The same name is always the same account. With ticket `T1`: Alice buys (leave From blank), Alice to Bob,
-  Bob to Carol, Carol to Alice. When Carol sells it back, the loop turns red, "Detected" appears and *Loops flagged* goes from 69 to 70.
-- **Let the panel pick the input.** Ask for any names and prices and type them in. Try a resale at 5 times the price: the
-  *Price anomalies* counter goes from 150 to 151.
-- **Show input from somewhere else.** Open Swagger (http://localhost:8000/docs) in another window, run `POST /transactions` with
-  the example body from `docs/API.md`, and do not touch the live page. It shows `POST /transactions (from Swagger)`, the commands,
-  and the graph updates on its own. (Swagger uses long ids, so those accounts are labelled with the first 6 characters.)
-- **Clear session** removes everything sent since the page opened, from both databases. Reloading the page also starts clean.
-
-## 5. Close (1 minute)
+On the live feed click **Clear session**, then check the console is back to **50,000 / 8,480 / 69 / 150**.
 
 - "All four detectors found every planted case, and each result explains itself. The data is synthetic, so those perfect scores
   show the detectors work, not how they would perform on real data. Review 3 adds noisier cases."
-- If asked, run `pytest -q` (19 tests, plus the demo tests).
+- If asked, run `pytest -q` (31 tests).
 
 ## Questions you may get
 
-- **Is it really real time?** The live page checks for new commands every second, syncs Cassandra to Neo4j as soon as it sees a new write, and redraws from Neo4j, so a change shows within about one to three seconds. The background sync (every 60 seconds) is the safety net.
-
+- **Is it really real time?** The pages check for new commands every second, sync Cassandra to Neo4j as soon as they see a new
+  write, and redraw from Neo4j, so a change shows within about one to three seconds. The background sync (every 60 seconds) is the safety net.
 - **Why two databases?** Cassandra is built for fast writes and for reads along one key. Neo4j is built for following relationships.
   Loops and clusters are relationship questions, which are awkward in tables. Each store does the job it is best at.
 - **Why four Cassandra tables with the same data?** Cassandra only reads efficiently along the partition key. One table per question
@@ -98,7 +81,8 @@ second, copies new Cassandra rows into Neo4j as soon as it sees them, and redraw
 
 ## If something goes wrong
 
-- **The graph area is empty or says the library could not load:** no internet. The steps and the log still work.
-- **An ERROR line appears in the log:** a database is not running. Check `docker ps`, wait a minute, press **Start over**.
-- **The numbers look off:** press **Start over**; it removes anything a previous run left behind.
-- **The page does not load at all:** the app is not running. Restart `uvicorn app.main:app`.
+- **The live feed says "Disconnected, retrying":** a database or the app is down. Run `docker ps` and check both containers are up.
+- **The graph area is empty with no error:** no internet. The log and the counters still work.
+- **The numbers look off:** click **Clear session** on the live feed, then reload both pages.
+- **A page does not load at all:** the app is not running. Restart `uvicorn app.main:app`.
+- **Do not type directly into `cqlsh` or Neo4j Browser during the demo.** Only input that goes through the app appears on the pages.
