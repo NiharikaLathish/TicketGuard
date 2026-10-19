@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketGuard | Live feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root {
+    --card:#262626; --text:#efeae0; --muted:#9b978e; --line:rgba(239,234,224,.16);
+    --red:#f0938b; --green:#b9d39a; --yellow:#f2d98a; --blue:#8fc1d4; --grey:#a8a39a;
+    --grad:linear-gradient(90deg,#c9d99e 0%,#efd2a6 55%,#f2a6a0 100%);
+    --font:"Outfit","Segoe UI",system-ui,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; padding:28px 20px 40px; color:var(--text); font:300 15px/1.6 var(--font);
+         background:linear-gradient(135deg,#b7d3a2 0%,#efb9b0 52%,#fbeab8 100%) fixed; }
+  button, input, select { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  .num { font-variant-numeric:tabular-nums; }
+  .frame { max-width:1240px; margin:0 auto; border-radius:6px; padding:0 48px 40px;
+           background:radial-gradient(120% 90% at 70% 0%,#3a3a3a 0%,#232323 55%,#1a1a1a 100%);
+           box-shadow:0 30px 60px rgba(60,40,40,.28), 0 7px 0 #e7c9ad; }
+
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:26px 0 6px; }
+  .mark { width:26px; height:26px; }
+  .links { display:flex; gap:32px; }
+  .links a { color:var(--text); text-decoration:none; font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.8; }
+  .links a:hover, .links a.on { opacity:1; color:var(--green); }
+  .btn { background:transparent; color:var(--text); border:1px solid var(--text); border-radius:2px; padding:9px 18px;
+         font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+  .btn:hover:not(:disabled) { background:var(--text); color:#1d1d1d; }
+  .btn:disabled { opacity:.35; cursor:default; }
+  .btn.solid { background:var(--green); border-color:var(--green); color:#1d1d1d; font-weight:500; }
+  .btn.solid:hover:not(:disabled) { background:#d4e6b9; border-color:#d4e6b9; }
+  .btn.sm { padding:5px 10px; font-size:11px; letter-spacing:.08em; }
+
+  .intro { padding:30px 0 16px; display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+  h1 { margin:0 0 8px; font-weight:400; font-size:clamp(32px,4.4vw,52px); line-height:1.05;
+       background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .intro p { max-width:640px; margin:0; color:var(--muted); font-size:14px; }
+  .status { display:flex; align-items:center; gap:10px; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .pulse { width:10px; height:10px; border-radius:50%; background:var(--green); box-shadow:0 0 0 0 rgba(185,211,154,.6); animation:pulse 1.6s infinite; }
+  .pulse.off { background:var(--red); animation:none; }
+  @keyframes pulse { 70% { box-shadow:0 0 0 10px rgba(185,211,154,0); } 100% { box-shadow:0 0 0 0 rgba(185,211,154,0); } }
+
+  .stage { display:grid; grid-template-columns:minmax(330px,.85fr) minmax(0,1.4fr); gap:18px; margin-top:6px; align-items:start; }
+  .panel { border:1px solid var(--line); border-radius:3px; background:rgba(255,255,255,.02); }
+  .panel-h { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .panel-h h2 { margin:0; font-size:12px; letter-spacing:.16em; text-transform:uppercase; font-weight:500; }
+  .panel-h small { color:var(--muted); }
+
+  form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px 18px 6px; }
+  label { display:flex; flex-direction:column; gap:5px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  label.wide { grid-column:1/-1; }
+  input, select { width:100%; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:2px; background:transparent; text-transform:none; letter-spacing:0; font-size:15px; }
+  input:focus, select:focus { outline:0; border-color:var(--green); }
+  select option { background:#232323; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; padding:6px 18px 4px; }
+  .hint { padding:6px 18px 16px; margin:0; color:var(--muted); font-size:12.5px; }
+  #msg { padding:0 18px 12px; margin:0; font-size:13px; color:var(--red); min-height:6px; }
+
+  .counters { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid var(--line); }
+  .counters div { padding:12px 14px; border-left:1px solid var(--line); }
+  .counters div:first-child { border-left:0; }
+  .counters small { display:block; color:var(--muted); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; min-height:32px; }
+  .counters b { font-size:25px; font-weight:300; }
+  .counters em { font-style:normal; font-size:12px; color:var(--green); margin-left:6px; }
+  .counters .flag b { color:var(--red); } .counters .flag em { color:var(--red); }
+  .canvas { position:relative; height:430px; }
+  #net { position:absolute; inset:0; }
+  .note { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:30px; color:var(--muted); }
+  .banner { padding:10px 18px; border-top:1px solid var(--line); font-size:13px; color:var(--muted); min-height:42px; }
+  .banner.flag { color:var(--red); } .banner div + div { margin-top:4px; }
+
+  .log { margin-top:18px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; letter-spacing:.06em; color:var(--muted); }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  #log { height:400px; overflow:auto; background:#141414; padding:10px 0; font:12px/1.5 var(--mono); }
+  #log::-webkit-scrollbar { width:8px; } #log::-webkit-scrollbar-thumb { background:#3a3a3a; }
+  .ln { display:grid; grid-template-columns:78px 92px 1fr; gap:10px; padding:3px 16px; }
+  .ln:hover { background:rgba(255,255,255,.03); }
+  .ln.new { animation:flash 1.4s ease-out; }
+  @keyframes flash { from { background:rgba(185,211,154,.22); } to { background:transparent; } }
+  .ln .t { color:#6f6b63; } .ln .b { font-weight:600; letter-spacing:.04em; }
+  .ln pre { margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; color:#ddd7c9; }
+  .ln.api .b { color:var(--grey); } .ln.cassandra .b { color:var(--green); } .ln.neo4j .b { color:var(--blue); }
+  .ln.sync .b { color:var(--yellow); } .ln.detect .b, .ln.detect pre { color:var(--red); }
+  .empty { padding:30px 16px; color:#6f6b63; font:13px var(--mono); }
+
+  @media (max-width:1060px) {
+    .frame { padding:0 20px 30px; } .links { display:none; } .stage { grid-template-columns:1fr; }
+    .counters { grid-template-columns:repeat(2,1fr); } .ln { grid-template-columns:1fr; gap:0; } form { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="nav">
+    <svg class="mark" viewBox="0 0 26 26" fill="none" stroke="#efeae0" stroke-width="1.3"><circle cx="13" cy="13" r="11.5"/><circle cx="13" cy="13" r="7"/><circle cx="13" cy="13" r="2.6" fill="#efeae0"/></svg>
+    <nav class="links"><a href="/">Console</a><a href="/demo">Live demo</a><a href="/live" class="on">Live feed</a><a href="/docs" target="_blank" rel="noopener">API</a></nav>
+    <button class="btn" id="clear">Clear session</button>
+  </header>
+
+  <section class="intro">
+    <div>
+      <h1>Type it. Watch it land.</h1>
+      <p>Send a transaction below, or from Swagger or the console in another window. The commands that reach Cassandra and Neo4j appear underneath as they happen, and the graph redraws from Neo4j by itself.</p>
+    </div>
+    <div class="status"><i class="pulse" id="pulse"></i><span id="status">Connecting...</span></div>
+  </section>
+
+  <div class="stage">
+    <section class="panel">
+      <div class="panel-h"><h2>Send a transaction</h2><small>names are fine</small></div>
+      <div class="chips" id="chips"></div>
+      <form id="form" autocomplete="off">
+        <label>From (blank = platform)<input name="seller" placeholder="e.g. Alice"></label>
+        <label>To<input name="buyer" placeholder="e.g. Bob" required></label>
+        <label>Ticket<input name="ticket" value="T1" required></label>
+        <label>Type<select name="type"><option>Resale</option><option>Transfer</option><option>Purchase</option></select></label>
+        <label>Original price<input name="face" type="number" min="0" step="0.01" value="100" required></label>
+        <label>Resale price<input name="price" type="number" min="0" step="0.01" value="105" required></label>
+        <label class="wide"><button class="btn solid" type="submit" id="send">Send</button></label>
+      </form>
+      <p id="msg"></p>
+      <p class="hint">The same name is always the same account, so typing "Alice" twice reuses her. Leave From blank for a purchase from the platform. Anything sent from Swagger (<a href="/docs" target="_blank" rel="noopener" style="color:var(--green)">/docs</a>) shows up here too.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-h"><h2>What Neo4j holds right now</h2><small>activity since this page opened</small></div>
+      <div class="counters" id="counters"></div>
+      <div class="canvas"><div id="net"></div><div class="note" id="gnote">Nothing yet. Send a transaction and it will appear here.</div></div>
+      <div class="banner" id="banner"><div>Nothing flagged yet.</div></div>
+    </section>
+  </div>
+
+  <section class="panel log">
+    <div class="panel-h">
+      <h2>Commands as they happen</h2>
+      <div class="legend">
+        <span><i style="background:var(--grey)"></i>API request</span>
+        <span><i style="background:var(--green)"></i>Cassandra (CQL)</span>
+        <span><i style="background:var(--yellow)"></i>Sync</span>
+        <span><i style="background:var(--blue)"></i>Neo4j (Cypher)</span>
+        <span><i style="background:var(--red)"></i>Detection</span>
+      </div>
+    </div>
+    <div id="log"><div class="empty">Listening. Commands will appear here the moment they run.</div></div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PLATFORM = '00000000-0000-0000-0000-000000000001';
+const j = async (url, opt) => {
+  const r = await fetch(url, opt);
+  if (!r.ok) {
+    let why = ''; try { const d = await r.json(); why = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail); } catch (e) {}
+    throw new Error(why || `${opt?.method || 'GET'} ${url} returned HTTP ${r.status}`);
+  }
+  return r.json();
+};
+const post = (url, body) => j(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+
+let sinceMs = 0, lastCmd = 0, names = {}, baseline = null, current = null, ticking = false, again = false, needsRefresh = true;
+let net = null, nodes = null, edges = null;
+
+/* ------------------------------------------------------------------ command log */
+const LABEL = { api: 'API', cassandra: 'CASSANDRA', neo4j: 'NEO4J', sync: 'SYNC', detect: 'DETECT' };
+function addLog(store, text, at = new Date()) {
+  const el = $('#log');
+  if (el.querySelector('.empty')) el.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'ln new ' + store;
+  row.innerHTML = `<span class="t">${at.toTimeString().slice(0, 8)}</span><span class="b">${LABEL[store]}</span><pre>${esc(text)}</pre>`;
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() { $('#log').innerHTML = '<div class="empty">Listening. Commands will appear here the moment they run.</div>'; }
+async function pull() {
+  const r = await j('/commands?after=' + lastCmd);
+  lastCmd = r.last_id;
+  r.commands.forEach(c => addLog(c.store, c.text, new Date(c.at)));
+  return r.commands;
+}
+
+/* ------------------------------------------------------------------ counters and detection */
+async function snapshot() {
+  const [st, cyc, pri] = await Promise.all([j('/stats'), j('/fraud/cycles'), j('/fraud/pricing?limit=5000')]);
+  return { tx: st.cassandra_transactions, acc: st.neo4j.accounts, tr: st.neo4j.transfers, loops: cyc.length, spikes: pri.length, cyc, pri };
+}
+function renderCounters() {
+  const items = [['Cassandra transactions', 'tx', ''], ['Neo4j accounts', 'acc', ''], ['Neo4j transfers', 'tr', ''],
+                 ['Loops flagged', 'loops', 'flag'], ['Price anomalies', 'spikes', 'flag']];
+  $('#counters').innerHTML = items.map(([label, k, cls]) => {
+    const d = current && baseline ? current[k] - baseline[k] : 0;
+    return `<div class="${cls}"><small>${label}</small><b class="num">${current ? current[k].toLocaleString() : '&ndash;'}</b>${d ? `<em>${d > 0 ? '+' : ''}${d}</em>` : ''}</div>`;
+  }).join('');
+}
+const nameOf = id => id === PLATFORM ? 'Platform' : names[id] || id.slice(0, 6);
+
+/* ------------------------------------------------------------------ graph */
+function ensureNet() {
+  if (net) return true;
+  if (typeof vis === 'undefined') { $('#gnote').textContent = 'The graph library (vis-network) could not load. It needs an internet connection.'; return false; }
+  nodes = new vis.DataSet(); edges = new vis.DataSet();
+  net = new vis.Network($('#net'), { nodes, edges }, {
+    nodes: { shape: 'dot', size: 18, borderWidth: 2, font: { color: css('--text'), size: 15, face: 'Outfit' } },
+    edges: { arrows: { to: { scaleFactor: .7 } }, smooth: false,
+             font: { color: css('--text'), size: 13, strokeWidth: 5, strokeColor: '#262626', align: 'horizontal' } },
+    physics: false, interaction: { hover: true },
+  });
+  return true;
+}
+const nodeColor = (id, flagged) => {
+  const bg = flagged ? css('--red') : id === PLATFORM ? css('--grey') : css('--green');
+  return { background: bg, border: '#1d1d1d', highlight: { background: bg, border: css('--text') } };
+};
+function draw(g, snap) {
+  const tx = g.transfers;
+  if (!tx.length) {
+    if (net) { net.destroy(); net = nodes = edges = null; }
+    $('#gnote').style.display = 'flex';
+    $('#banner').className = 'banner'; $('#banner').innerHTML = '<div>Nothing flagged yet.</div>'; flaggedKey = '';
+    return;
+  }
+  if (!ensureNet()) return;
+  $('#gnote').style.display = 'none';
+
+  const order = [];   // accounts in order of first appearance, placed on a circle; the platform sits to the left
+  tx.forEach(t => [t.seller, t.buyer].forEach(id => { if (id !== PLATFORM && !order.includes(id)) order.push(id); }));
+  const R = Math.max(90, 30 * order.length), pos = {};
+  order.forEach((id, i) => { const a = -Math.PI / 2 + 2 * Math.PI * i / Math.max(order.length, 1); pos[id] = [R * Math.cos(a), R * Math.sin(a)]; });
+  pos[PLATFORM] = [-R - 160, -R * 0.55];
+
+  const liveTickets = new Set(tx.map(t => t.ticket)), liveTx = new Set(tx.map(t => t.tx));
+  const loops = snap.cyc.filter(c => liveTickets.has(c.ticket_id));
+  const spikes = snap.pri.filter(p => liveTx.has(p.transaction_id));
+  const flaggedAccounts = new Set(loops.flatMap(c => c.accounts)), spikeTx = new Set(spikes.map(p => p.transaction_id));
+  const inLoop = t => t.type !== 'Purchase' && loops.some(c => c.ticket_id === t.ticket && c.accounts.includes(t.seller) && c.accounts.includes(t.buyer));
+
+  const present = new Set(); let usesPlatform = false;
+  tx.forEach(t => { present.add(t.seller); present.add(t.buyer); if (t.seller === PLATFORM) usesPlatform = true; });
+  present.forEach(id => nodes.update({ id, label: nameOf(id), x: pos[id][0], y: pos[id][1], color: nodeColor(id, flaggedAccounts.has(id)) }));
+  nodes.getIds().filter(id => !String(id).startsWith('_pad') && !present.has(id)).forEach(id => nodes.remove(id));
+
+  const xs = Object.values(pos).map(p => p[0]), ys = Object.values(pos).map(p => p[1]), pad = 80;
+  [[Math.min(...xs) - pad, Math.min(...ys) - pad], [Math.max(...xs) + pad, Math.max(...ys) + pad + 20]].forEach(([x, y], i) =>
+    nodes.update({ id: '_pad' + i, x, y, size: 1, label: '', shape: 'dot', color: { background: 'transparent', border: 'transparent' }, chosen: false }));
+
+  const last = tx[tx.length - 1].tx, count = {};
+  tx.forEach(t => {
+    const key = t.seller + '>' + t.buyer, k = count[key] = (count[key] ?? -1) + 1;
+    const reverse = tx.some(o => o.seller === t.buyer && o.buyer === t.seller);
+    const flagged = spikeTx.has(t.tx) || inLoop(t);
+    edges.update({ id: t.tx, from: t.seller, to: t.buyer, dashes: t.type === 'Purchase',
+      label: (names[t.ticket] ? names[t.ticket] + ' ' : '') + (t.type === 'Purchase' ? 'buys $' + t.face : '$' + t.price),
+      width: flagged || t.tx === last ? 3.5 : 1.5,
+      color: { color: flagged ? css('--red') : t.tx === last ? css('--green') : css('--muted') },
+      smooth: (k > 0 || reverse) ? { type: 'curvedCW', roundness: 0.2 + 0.18 * k } : false });
+  });
+  edges.getIds().filter(id => !liveTx.has(id)).forEach(id => edges.remove(id));
+  setTimeout(() => net && net.fit({ animation: { duration: 400 } }), 60);
+
+  const lines = [...loops.map(c => c.reason), ...spikes.map(p => p.reason)];
+  $('#banner').className = 'banner' + (lines.length ? ' flag' : '');
+  $('#banner').innerHTML = lines.length ? lines.map(l => `<div>Detected: ${esc(l)}</div>`).join('') : '<div>Nothing flagged yet.</div>';
+  const before = flaggedKey; flaggedKey = lines.join('|');
+  if (flaggedKey && flaggedKey !== before) lines.forEach(l => { if (!before.includes(l)) addLog('detect', 'FLAGGED: ' + l); });
+}
+let flaggedKey = '';
+
+async function refresh() {
+  const [g, snap] = await Promise.all([j('/live/graph?since_ms=' + sinceMs), snapshot()]);
+  names = g.names || {};
+  current = snap; renderCounters(); draw(g, snap);
+}
+
+/* ------------------------------------------------------------------ the live loop */
+function setStatus(ok, text) {
+  $('#pulse').className = 'pulse' + (ok ? '' : ' off');
+  $('#status').textContent = ok ? 'Live, updated ' + new Date().toTimeString().slice(0, 8) : (text || 'Disconnected, retrying');
+}
+async function tick() {
+  if (ticking) { again = true; return; }
+  ticking = true;
+  try {
+    let fresh = await pull();
+    let changed = fresh.length > 0;
+    if (fresh.some(c => c.store === 'cassandra')) {          // something new reached Cassandra: copy it to Neo4j now
+      addLog('api', 'POST /sync   (automatic: new rows found in Cassandra)');
+      await post('/sync');
+      fresh = await pull();
+      changed = true;
+    }
+    if (changed || needsRefresh) { needsRefresh = false; await refresh(); }
+    setStatus(true);
+  } catch (e) {
+    setStatus(false, 'Disconnected, retrying');
+    needsRefresh = true;
+  } finally {
+    ticking = false;
+    if (again) { again = false; setTimeout(tick, 50); }
+  }
+}
+
+/* ------------------------------------------------------------------ the form */
+const CHIPS = [
+  ['Alice buys a ticket', { seller: '', buyer: 'Alice', ticket: 'T1', type: 'Purchase', face: 100, price: 0 }],
+  ['Alice to Bob', { seller: 'Alice', buyer: 'Bob', ticket: 'T1', type: 'Resale', face: 100, price: 105 }],
+  ['Bob to Carol', { seller: 'Bob', buyer: 'Carol', ticket: 'T1', type: 'Resale', face: 100, price: 108 }],
+  ['Carol to Alice (closes the loop)', { seller: 'Carol', buyer: 'Alice', ticket: 'T1', type: 'Resale', face: 100, price: 110 }],
+  ['Price spike', { seller: 'Dave', buyer: 'Erin', ticket: 'T2', type: 'Resale', face: 100, price: 500 }],
+];
+$('#chips').innerHTML = CHIPS.map(([label], i) => `<button class="btn sm" type="button" data-i="${i}">${esc(label)}</button>`).join('');
+$('#chips').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const v = CHIPS[+b.dataset.i][1], f = $('#form');
+  Object.keys(v).forEach(k => f.elements[k].value = v[k]);
+  f.elements.buyer.focus();
+};
+$('#form').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target), msg = $('#msg');
+  const body = { seller: f.get('seller').trim() || null, buyer: f.get('buyer').trim(), ticket: f.get('ticket').trim(),
+                 type: f.get('type'), face: parseFloat(f.get('face')), price: parseFloat(f.get('price')) };
+  msg.textContent = '';
+  addLog('api', 'POST /live/transaction   ' + JSON.stringify(body));
+  try { await post('/live/transaction', body); setTimeout(tick, 30); }
+  catch (err) { msg.textContent = err.message; addLog('api', 'ERROR: ' + err.message); }
+};
+$('#clear').onclick = async () => {
+  $('#clear').disabled = true;
+  try {
+    addLog('api', 'POST /live/clear   (removes everything sent since this page opened, from both databases)');
+    const r = await post('/live/clear?since_ms=' + sinceMs);
+    addLog('api', `removed ${r.deleted} transaction(s)`);
+    needsRefresh = true; flaggedKey = ''; setTimeout(tick, 30);
+  } catch (err) { addLog('api', 'ERROR: ' + err.message); }
+  $('#clear').disabled = false;
+};
+
+/* ------------------------------------------------------------------ start */
+(async function init() {
+  try {
+    await post('/demo/reset');                       // start clean: removes anything a previous demo left behind
+    sinceMs = (await j('/live/now')).now_ms;
+    lastCmd = (await j('/commands?limit=0')).last_id;
+    baseline = current = await snapshot(); renderCounters();
+    setStatus(true);
+  } catch (e) { setStatus(false, 'Cannot reach the databases. Is Docker running?'); }
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
