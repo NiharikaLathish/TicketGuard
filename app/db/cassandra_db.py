@@ -16,7 +16,7 @@ from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import BatchStatement, BatchType
 
-from app import config
+from app import commandlog, config
 
 COLUMNS = ["transaction_id", "event_id", "ticket_id", "buyer_id", "seller_id",
            "ts", "purchase_price", "resale_price", "transaction_type", "fraud_pattern"]
@@ -108,6 +108,24 @@ def _insert_stmt(table: str):
     return _prep(f"ins_{table}", f"INSERT INTO {table} ({COL_LIST}, day) VALUES ({PLACEHOLDERS}, ?)")
 
 
+def _lit(v) -> str:
+    """Render a value the way it would be typed in cqlsh (used only for the demo command log)."""
+    if isinstance(v, (uuid.UUID, Decimal)):
+        return str(v)
+    if isinstance(v, datetime):
+        return "'" + v.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + "+0000'"
+    return "'" + str(v) + "'"
+
+
+def _fill(cql: str, values: list) -> str:
+    """Replace each ? in a prepared statement with its value, so the log shows a runnable statement."""
+    parts = cql.split("?")
+    out = parts[0]
+    for v, rest in zip(values, parts[1:]):
+        out += _lit(v) + rest
+    return out
+
+
 # ---------------------------------------------------------------- CREATE
 def insert_transaction(tx: dict) -> dict:
     """Write one transaction to all four query tables atomically (logged batch)."""
@@ -116,6 +134,8 @@ def insert_transaction(tx: dict) -> dict:
     for t in TABLES:
         batch.add(_insert_stmt(t), vals)
     get_session().execute(batch)
+    for t in TABLES:
+        commandlog.record("cassandra", _fill(f"INSERT INTO {t} ({COL_LIST}, day) VALUES ({PLACEHOLDERS}, ?);", vals))
     return get_transaction(vals[0])
 
 
@@ -206,6 +226,8 @@ def update_transaction(tx_id, changes: dict) -> dict | None:
     for table, (where, kv) in _key_clauses(current).items():
         batch.add(_prep(f"upd_{table}_{sets}", f"UPDATE {table} SET {sets} WHERE {where}"), vals + kv)
     get_session().execute(batch)
+    for table, (where, kv) in _key_clauses(current).items():
+        commandlog.record("cassandra", _fill(f"UPDATE {table} SET {sets} WHERE {where};", vals + kv))
     return get_transaction(tx_id)
 
 
@@ -218,6 +240,8 @@ def delete_transaction(tx_id) -> bool:
     for table, (where, kv) in _key_clauses(current).items():
         batch.add(_prep(f"del_{table}", f"DELETE FROM {table} WHERE {where}"), kv)
     get_session().execute(batch)
+    for table, (where, kv) in _key_clauses(current).items():
+        commandlog.record("cassandra", _fill(f"DELETE FROM {table} WHERE {where};", kv))
     return True
 
 

@@ -7,6 +7,7 @@ newer than the watermark. Graph writes are MERGE-based, so re-running is idempot
 import time
 from datetime import datetime, timezone
 
+from app import commandlog
 from app.db import cassandra_db, neo4j_db
 
 BATCH = 2000
@@ -34,4 +35,6 @@ def run_sync(full: bool = False) -> dict:
             buf = []
     synced += neo4j_db.upsert_transactions(buf)
     neo4j_db.set_watermark(max_ms)
+    if synced:
+        commandlog.record("sync", f"sync: copied {synced} transaction(s) from Cassandra to Neo4j")
     return {"synced": synced, "watermark": max_ms, "seconds": round(time.time() - t0, 2)}

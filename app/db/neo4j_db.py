@@ -15,7 +15,7 @@ Graph model
 """
 from neo4j import GraphDatabase
 
-from app import config
+from app import commandlog, config
 
 _driver = None
 
@@ -84,11 +84,34 @@ def upsert_transactions(rows: list[dict]) -> int:
         "transaction_type": r["transaction_type"], "fraud_pattern": r["fraud_pattern"],
     } for r in rows]
     run(UPSERT_TX, rows=payload, platform=config.PLATFORM_ACCOUNT_ID)
+    if len(payload) <= 5:
+        for r in payload:
+            commandlog.record("neo4j", _cypher_for_row(r))
+    else:
+        commandlog.record("neo4j", f"// {len(payload)} transactions in one batch, $rows = [...]\n{UPSERT_TX.strip()}")
     return len(rows)
+
+
+def _cypher_for_row(r: dict) -> str:
+    """The statement above written out for a single transaction (for the demo command log)."""
+    lines = [
+        f"MERGE (b:Account {{account_id: '{r['buyer_id']}'}})",
+        f"MERGE (s:Account {{account_id: '{r['seller_id']}'}})",
+        f"MERGE (t:Ticket {{ticket_id: '{r['ticket_id']}'}})-[:BELONGS_TO]->(:Event {{event_id: '{r['event_id']}'}})",
+        f"MERGE (x:Transaction {{transaction_id: '{r['transaction_id']}'}})"
+        f"  // {r['transaction_type']}, price {r['resale_price']}",
+        "MERGE (x)-[:INVOLVES]->(t)  MERGE (x)-[:MADE_BY]->(b)  MERGE (b)-[:PURCHASED]->(t)  MERGE (s)-[:SOLD]->(t)",
+    ]
+    if r["seller_id"] != config.PLATFORM_ACCOUNT_ID:
+        lines.append(f"MERGE (s)-[:TRANSFERRED_TO {{tx_id: '{r['transaction_id']}', ticket_id: '{r['ticket_id']}', "
+                     f"price: {r['resale_price']}}}]->(b)")
+    return "\n".join(lines)
 
 
 def delete_transaction(tx_id: str):
     """Remove a transaction from the graph, plus any edges/nodes that only it justified."""
+    commandlog.record("neo4j", f"MATCH (x:Transaction {{transaction_id: '{tx_id}'}}) DETACH DELETE x\n"
+                               "// then remove the ticket, event and accounts that only this transaction justified")
     info = run("""MATCH (x:Transaction {transaction_id:$id})-[:INVOLVES]->(t:Ticket), (x)-[:MADE_BY]->(b:Account)
                   OPTIONAL MATCH (s:Account)-[:TRANSFERRED_TO {tx_id:$id}]->(b)
                   RETURN t.ticket_id AS t, b.account_id AS b, s.account_id AS s""", id=tx_id)
@@ -181,3 +204,23 @@ def stats() -> dict:
 def clear_graph():
     while run("MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(*) AS c")[0]["c"] > 0:
         pass
+
+
+# ---------------------------------------------------------------- live demo helpers
+def ticket_graph(ticket_id: str) -> dict:
+    """Every transfer of one ticket as stored in the graph, oldest first (drawn on the demo page)."""
+    q = """MATCH (x:Transaction)-[:INVOLVES]->(:Ticket {ticket_id: $t}), (x)-[:MADE_BY]->(b:Account)
+OPTIONAL MATCH (s:Account)-[:TRANSFERRED_TO {tx_id: x.transaction_id}]->(b)
+RETURN x.transaction_type AS type, s.account_id AS seller, b.account_id AS buyer,
+       x.purchase_price AS face, x.resale_price AS price, x.ts AS ts
+ORDER BY x.ts"""
+    commandlog.record("neo4j", q.replace("$t", f"'{ticket_id}'"))
+    platform = config.PLATFORM_ACCOUNT_ID
+    return {"platform": platform,
+            "transfers": [{**r, "seller": r["seller"] or platform} for r in run(q, t=ticket_id)]}
+
+
+def demo_transaction_ids() -> list[str]:
+    """Ids of transactions created by the demo page (labelled fraud_pattern 'demo'), newest first."""
+    rows = run("MATCH (x:Transaction {fraud_pattern: 'demo'}) RETURN x.transaction_id AS id ORDER BY x.ts DESC")
+    return [r["id"] for r in rows]
