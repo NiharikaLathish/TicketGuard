@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from app import config, detection, sync, sync_worker
+from app import commandlog, config, detection, sync, sync_worker
 from app.db import cassandra_db, neo4j_db
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -219,3 +219,31 @@ def fraud_graph(pattern: str = Query("all", pattern="^(all|circular_resale|bot_r
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+# ---------------------------------------------------------------- live demo page (hidden from Swagger)
+@app.get("/demo", include_in_schema=False)
+def demo_page():
+    return FileResponse(STATIC / "demo.html")
+
+
+@app.get("/commands", include_in_schema=False)
+def commands(after: int = 0, limit: int = 200):
+    """Recent CQL / Cypher commands the app ran, for the demo page's command log."""
+    return commandlog.since(after, limit)
+
+
+@app.get("/demo/graph", include_in_schema=False)
+def demo_graph(ticket_id: uuid.UUID):
+    return neo4j_db.ticket_graph(str(ticket_id))
+
+
+@app.post("/demo/reset", include_in_schema=False)
+def demo_reset():
+    """Delete every transaction the demo page created (fraud_pattern 'demo') from both databases."""
+    sync.run_sync()  # make sure nothing is still waiting in Cassandra
+    ids = neo4j_db.demo_transaction_ids()
+    for tid in ids:  # newest first, so the graph cleanup unwinds in reverse order
+        if cassandra_db.delete_transaction(tid):
+            neo4j_db.delete_transaction(tid)
+    return {"deleted": len(ids)}

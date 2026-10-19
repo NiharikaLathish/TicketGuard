@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketGuard | Live demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root {
+    --card:#262626; --text:#efeae0; --muted:#9b978e; --line:rgba(239,234,224,.16);
+    --red:#f0938b; --green:#b9d39a; --yellow:#f2d98a; --blue:#8fc1d4; --grey:#a8a39a;
+    --grad:linear-gradient(90deg,#c9d99e 0%,#efd2a6 55%,#f2a6a0 100%);
+    --font:"Outfit","Segoe UI",system-ui,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; padding:28px 20px 40px; color:var(--text); font:300 15px/1.6 var(--font);
+         background:linear-gradient(135deg,#b7d3a2 0%,#efb9b0 52%,#fbeab8 100%) fixed; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .num { font-variant-numeric:tabular-nums; }
+  .frame { max-width:1240px; margin:0 auto; border-radius:6px; padding:0 48px 40px;
+           background:radial-gradient(120% 90% at 70% 0%,#3a3a3a 0%,#232323 55%,#1a1a1a 100%);
+           box-shadow:0 30px 60px rgba(60,40,40,.28), 0 7px 0 #e7c9ad; }
+
+  .nav { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:26px 0 6px; }
+  .mark { width:26px; height:26px; }
+  .links { display:flex; gap:32px; }
+  .links a { color:var(--text); text-decoration:none; font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.8; }
+  .links a:hover, .links a.on { opacity:1; color:var(--green); }
+  .btn { background:transparent; color:var(--text); border:1px solid var(--text); border-radius:2px; padding:9px 18px;
+         font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+  .btn:hover:not(:disabled) { background:var(--text); color:#1d1d1d; }
+  .btn:disabled { opacity:.35; cursor:default; }
+  .btn.solid { background:var(--green); border-color:var(--green); color:#1d1d1d; font-weight:500; }
+  .btn.solid:hover:not(:disabled) { background:#d4e6b9; border-color:#d4e6b9; }
+
+  .intro { padding:34px 0 18px; }
+  h1 { margin:0 0 10px; font-weight:400; font-size:clamp(34px,4.6vw,54px); line-height:1.05;
+       background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .intro p { max-width:640px; margin:0 0 18px; color:var(--muted); font-size:14px; }
+  .tabs { display:flex; gap:22px; border-bottom:1px solid var(--line); }
+  .tabs button { background:none; border:0; border-bottom:2px solid transparent; padding:8px 0; color:var(--muted);
+                 font-size:12px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:-1px; }
+  .tabs button.on { color:var(--text); border-color:var(--green); }
+  .tabs button:disabled { opacity:.4; cursor:default; }
+
+  .stage { display:grid; grid-template-columns:minmax(300px,.9fr) minmax(0,1.3fr); gap:18px; margin-top:18px; align-items:start; }
+  .panel { border:1px solid var(--line); border-radius:3px; background:rgba(255,255,255,.02); }
+  .panel-h { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .panel-h h2 { margin:0; font-size:12px; letter-spacing:.16em; text-transform:uppercase; font-weight:500; }
+  .panel-h small { color:var(--muted); }
+
+  ol.steps { list-style:none; margin:0; padding:6px 0; }
+  ol.steps li { padding:12px 18px; border-bottom:1px solid var(--line); display:grid; grid-template-columns:28px 1fr; gap:10px; opacity:.5; }
+  ol.steps li:last-child { border-bottom:0; }
+  ol.steps li.active, ol.steps li.done { opacity:1; }
+  ol.steps li.active { background:rgba(185,211,154,.08); }
+  .n { width:24px; height:24px; border:1px solid var(--muted); border-radius:50%; display:grid; place-items:center; font-size:12px; color:var(--muted); }
+  li.active .n { border-color:var(--green); color:var(--green); }
+  li.done .n { background:var(--green); border-color:var(--green); color:#1d1d1d; }
+  .st { font-size:15px; }
+  .say { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .res { margin:6px 0 0; font-size:12.5px; color:var(--green); }
+  .res.flag { color:var(--red); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; padding:14px 18px; border-top:1px solid var(--line); }
+
+  .counters { display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1px solid var(--line); }
+  .counters div { padding:12px 16px; border-left:1px solid var(--line); }
+  .counters div:first-child { border-left:0; }
+  .counters small { display:block; color:var(--muted); font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+  .counters b { font-size:26px; font-weight:300; }
+  .counters em { font-style:normal; font-size:12px; color:var(--green); margin-left:6px; }
+  .counters .flagged b { color:var(--red); }
+  .canvas { position:relative; height:420px; }
+  #net { position:absolute; inset:0; }
+  .note { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:30px; color:var(--muted); }
+  .banner { padding:10px 18px; border-top:1px solid var(--line); font-size:13px; color:var(--muted); min-height:42px; }
+  .banner.flag { color:var(--red); }
+
+  .log { margin-top:18px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; letter-spacing:.06em; color:var(--muted); }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  #log { height:430px; overflow:auto; background:#141414; padding:10px 0; font:12px/1.5 var(--mono); }
+  #log::-webkit-scrollbar { width:8px; } #log::-webkit-scrollbar-thumb { background:#3a3a3a; }
+  .ln { display:grid; grid-template-columns:78px 92px 1fr; gap:10px; padding:3px 16px; }
+  .ln:hover { background:rgba(255,255,255,.03); }
+  .ln .t { color:#6f6b63; }
+  .ln .b { font-weight:600; letter-spacing:.04em; }
+  .ln pre { margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; color:#ddd7c9; }
+  .ln.api .b { color:var(--grey); } .ln.cassandra .b { color:var(--green); } .ln.neo4j .b { color:var(--blue); }
+  .ln.sync .b { color:var(--yellow); } .ln.detect .b { color:var(--red); }
+  .ln.detect pre { color:var(--red); }
+  .ln.step { margin-top:8px; padding-top:9px; border-top:1px solid #333; }
+  .ln.step .b { color:#efeae0; } .ln.step pre { color:#efeae0; font-weight:600; }
+  .empty { padding:30px 16px; color:#6f6b63; font:13px var(--mono); }
+
+  @media (max-width:980px) {
+    .frame { padding:0 20px 30px; } .links { display:none; } .stage { grid-template-columns:1fr; }
+    .counters { grid-template-columns:repeat(2,1fr); } .ln { grid-template-columns:1fr; gap:0; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="nav">
+    <svg class="mark" viewBox="0 0 26 26" fill="none" stroke="#efeae0" stroke-width="1.3"><circle cx="13" cy="13" r="11.5"/><circle cx="13" cy="13" r="7"/><circle cx="13" cy="13" r="2.6" fill="#efeae0"/></svg>
+    <nav class="links"><a href="/">Console</a><a href="/demo" class="on">Live demo</a><a href="/docs" target="_blank" rel="noopener">API</a></nav>
+    <button class="btn" id="reset">Start over</button>
+  </header>
+
+  <section class="intro">
+    <h1>Watch a command become a graph</h1>
+    <p id="intro">Each step sends a real transaction to the API. Below you see the exact commands that reach Cassandra and Neo4j, and the graph on the right is read back from Neo4j after every step.</p>
+    <div class="tabs" id="tabs"></div>
+  </section>
+
+  <div class="stage">
+    <section class="panel">
+      <div class="panel-h"><h2>Steps</h2><small id="progress"></small></div>
+      <ol class="steps" id="steps"></ol>
+      <div class="actions">
+        <button class="btn solid" id="next">Run next step</button>
+        <button class="btn" id="all">Run all</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-h"><h2>What Neo4j holds for this ticket</h2><small>read back after every step</small></div>
+      <div class="counters" id="counters"></div>
+      <div class="canvas"><div id="net"></div><div class="note" id="gnote">The graph appears after the first step.</div></div>
+      <div class="banner" id="banner">Nothing flagged yet.</div>
+    </section>
+  </div>
+
+  <section class="panel log">
+    <div class="panel-h">
+      <h2>Commands as they ran</h2>
+      <div class="legend">
+        <span><i style="background:var(--grey)"></i>API request</span>
+        <span><i style="background:var(--green)"></i>Cassandra (CQL)</span>
+        <span><i style="background:var(--yellow)"></i>Sync</span>
+        <span><i style="background:var(--blue)"></i>Neo4j (Cypher)</span>
+        <span><i style="background:var(--red)"></i>Detection</span>
+      </div>
+    </div>
+    <div id="log"><div class="empty">Press "Run next step" and the commands will appear here.</div></div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const uuid = () => crypto.randomUUID ? crypto.randomUUID()
+  : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c == 'x' ? r : (r & 3 | 8)).toString(16); });
+const j = async (url, opt) => {
+  const r = await fetch(url, opt);
+  if (!r.ok) throw new Error(`${opt?.method || 'GET'} ${url} returned HTTP ${r.status}`);
+  return r.json();
+};
+const post = (url, body) => j(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+const PLATFORM = '00000000-0000-0000-0000-000000000001';
+
+/* ------------------------------------------------------------------ scenarios */
+const SCENARIOS = {
+  loop: {
+    label: 'Circular resale',
+    intro: 'Three accounts pass one ticket around in a circle. Watch the chain close into a loop, then get flagged.',
+    people: ['Alice', 'Bob', 'Carol'], metric: 'cycles',
+    layout: { Platform: [-270, -90], Alice: [0, -90], Bob: [150, 80], Carol: [-150, 80] }, metricLabel: 'Circular resales flagged',
+    steps: [
+      { title: 'Alice buys a new ticket from the platform', from: null, to: 'Alice', type: 'Purchase', face: 100, price: 0,
+        say: 'One transaction is written to Cassandra four times, once per way we will want to look it up. The sync then copies it into Neo4j as nodes and relationships.' },
+      { title: 'Alice resells it to Bob for 105', from: 'Alice', to: 'Bob', type: 'Resale', face: 100, price: 105,
+        say: 'A new arrow appears: Alice to Bob. A single resale at a normal price, so nothing is flagged.' },
+      { title: 'Bob resells it to Carol for 108', from: 'Bob', to: 'Carol', type: 'Resale', face: 100, price: 108,
+        say: 'The ticket moves on. It is still a chain, not a loop.' },
+      { title: 'Carol sells it back to Alice for 110', from: 'Carol', to: 'Alice', type: 'Resale', face: 100, price: 110, flagsLoop: true,
+        say: 'The ticket is back with the account that started it. The chain closes into a loop, and the cycle query flags it.' },
+    ],
+  },
+  spike: {
+    label: 'Price spike',
+    intro: 'A ticket is resold at five times its face price. The graph looks ordinary; the pricing rule is what catches it.',
+    people: ['Dave', 'Erin'], metric: 'pricing',
+    layout: { Platform: [-250, 0], Dave: [0, 0], Erin: [250, 0] }, metricLabel: 'Price anomalies flagged',
+    steps: [
+      { title: 'Dave buys a ticket at face value (100)', from: null, to: 'Dave', type: 'Purchase', face: 100, price: 0,
+        say: 'Same path as before: Cassandra first, then Neo4j through the sync.' },
+      { title: 'Dave resells it to Erin for 500', from: 'Dave', to: 'Erin', type: 'Resale', face: 100, price: 500, flagsPrice: true,
+        say: 'One edge, like any resale, but the price is five times the original, so the pricing rule flags it.' },
+    ],
+  },
+};
+
+/* ------------------------------------------------------------------ state */
+let key = 'loop', stepIndex = 0, busy = false, lastCmd = 0;
+let ids = {}, ticket = null, event = null, baseline = null, current = null, results = [];
+let net = null, nodes = null, edges = null;
+const sc = () => SCENARIOS[key];
+
+/* ------------------------------------------------------------------ command log */
+const LABEL = { step: 'STEP', api: 'API', cassandra: 'CASSANDRA', neo4j: 'NEO4J', sync: 'SYNC', detect: 'DETECT' };
+function addLog(store, text, at = new Date()) {
+  const el = $('#log');
+  if (el.querySelector('.empty')) el.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'ln ' + store;
+  row.innerHTML = `<span class="t">${at.toTimeString().slice(0, 8)}</span><span class="b">${LABEL[store]}</span><pre>${esc(text)}</pre>`;
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+}
+async function pullCommands() {
+  const r = await j('/commands?after=' + lastCmd);
+  lastCmd = r.last_id;
+  r.commands.forEach(c => addLog(c.store, c.text, new Date(c.at)));
+}
+function clearLog() { $('#log').innerHTML = '<div class="empty">Press "Run next step" and the commands will appear here.</div>'; }
+
+/* ------------------------------------------------------------------ names, counters */
+const nameOf = id => id === PLATFORM ? 'Platform' : (Object.keys(ids).find(n => ids[n] === id) || id.slice(0, 6));
+async function snapshot() {
+  const st = await j('/stats');
+  const flagged = sc().metric === 'cycles' ? (await j('/fraud/cycles')).length : (await j('/fraud/pricing?limit=5000')).length;
+  return { tx: st.cassandra_transactions, acc: st.neo4j.accounts, tr: st.neo4j.transfers, flagged };
+}
+function renderCounters() {
+  const items = [['Cassandra transactions', 'tx', ''], ['Neo4j accounts', 'acc', ''], ['Neo4j transfers', 'tr', ''], [sc().metricLabel, 'flagged', 'flagged']];
+  $('#counters').innerHTML = items.map(([label, k, cls]) => {
+    const v = current ? current[k].toLocaleString() : '&ndash;';
+    const d = current && baseline ? current[k] - baseline[k] : 0;
+    return `<div class="${cls}"><small>${label}</small><b class="num">${v}</b>${d ? `<em>+${d}</em>` : ''}</div>`;
+  }).join('');
+}
+
+/* ------------------------------------------------------------------ steps list */
+function renderSteps() {
+  $('#steps').innerHTML = sc().steps.map((s, i) => {
+    const state = i < stepIndex ? 'done' : i === stepIndex ? 'active' : '';
+    const r = results[i];
+    return `<li class="${state}"><span class="n">${i < stepIndex ? '&#10003;' : i + 1}</span><div>
+      <div class="st">${esc(s.title)}</div>
+      ${state === 'active' || state === 'done' ? `<p class="say">${esc(s.say)}</p>` : ''}
+      ${r ? `<p class="res ${r.flag ? 'flag' : ''}">${esc(r.text)}</p>` : ''}</div></li>`;
+  }).join('');
+  const done = stepIndex >= sc().steps.length;
+  $('#progress').textContent = `${Math.min(stepIndex, sc().steps.length)} of ${sc().steps.length} done`;
+  $('#next').disabled = busy || done;
+  $('#all').disabled = busy || done;
+  $('#reset').disabled = busy;
+  document.querySelectorAll('#tabs button').forEach(b => b.disabled = busy);
+  $('#next').textContent = stepIndex === 0 ? 'Run first step' : done ? 'Finished' : 'Run next step';
+}
+function renderTabs() {
+  $('#tabs').innerHTML = Object.entries(SCENARIOS).map(([k, s]) => `<button data-k="${k}" class="${k === key ? 'on' : ''}">${s.label}</button>`).join('');
+}
+
+/* ------------------------------------------------------------------ graph */
+function ensureNet() {
+  if (net) return true;
+  if (typeof vis === 'undefined') { $('#gnote').textContent = 'The graph library (vis-network) could not load. It needs an internet connection.'; return false; }
+  nodes = new vis.DataSet(); edges = new vis.DataSet();
+  // invisible corner points give the camera some padding, so labels near the edge are not clipped
+  const xy = Object.values(sc().layout), pad = 70;
+  [[Math.min(...xy.map(p => p[0])) - pad, Math.min(...xy.map(p => p[1])) - pad],
+   [Math.max(...xy.map(p => p[0])) + pad, Math.max(...xy.map(p => p[1])) + pad + 20]].forEach(([x, y], i) =>
+    nodes.add({ id: '_pad' + i, x, y, size: 1, label: '', shape: 'dot', color: { background: 'transparent', border: 'transparent' }, chosen: false }));
+  net = new vis.Network($('#net'), { nodes, edges }, {
+    nodes: { shape: 'dot', size: 18, borderWidth: 2, font: { color: css('--text'), size: 15, face: 'Outfit' } },
+    edges: { smooth: false, arrows: { to: { scaleFactor: .7 } }, font: { color: css('--text'), size: 14, strokeWidth: 5, strokeColor: '#262626', align: 'horizontal' } },
+    physics: false,
+    interaction: { hover: true },
+  });
+  return true;
+}
+function nodeColor(id, flagged) {
+  const bg = flagged ? css('--red') : id === PLATFORM ? css('--grey') : css('--green');
+  return { background: bg, border: '#1d1d1d', highlight: { background: bg, border: css('--text') } };
+}
+function drawGraph(g) {
+  if (!g.transfers.length || !ensureNet()) return;
+  $('#gnote').style.display = 'none';
+  g.transfers.forEach((t, i) => {
+    [t.seller, t.buyer].forEach(id => { if (!nodes.get(id)) { const [x, y] = sc().layout[nameOf(id)] || [0, 0]; nodes.add({ id, label: nameOf(id), x, y, color: nodeColor(id, false) }); } });
+    const eid = 'e' + i;
+    if (!edges.get(eid)) edges.add({ id: eid, from: t.seller, to: t.buyer, dashes: t.type === 'Purchase',
+      label: t.type === 'Purchase' ? 'buys $' + t.face : '$' + t.price });
+  });
+  const last = 'e' + (g.transfers.length - 1);
+  edges.update(edges.getIds().map(id => ({ id, width: id === last ? 3.5 : 1.5, color: { color: id === last ? css('--green') : css('--muted') } })));
+  setTimeout(() => net && net.fit({ animation: { duration: 400 } }), 60);
+}
+function flagGraph(accounts, edgeId) {
+  if (!net) return;
+  if (accounts) {
+    nodes.update(accounts.map(id => ({ id, color: nodeColor(id, true) })));
+    edges.update(edges.get().filter(e => accounts.includes(e.from) && accounts.includes(e.to) && !e.dashes)
+      .map(e => ({ id: e.id, color: { color: css('--red') }, width: 3.5 })));
+  }
+  if (edgeId) edges.update({ id: edgeId, color: { color: css('--red') }, width: 4 });
+}
+function clearGraph() {
+  if (net) { net.destroy(); net = null; nodes = null; edges = null; }
+  $('#gnote').style.display = 'flex'; $('#gnote').textContent = 'The graph appears after the first step.';
+}
+function banner(text, flag) { const b = $('#banner'); b.textContent = text; b.className = 'banner' + (flag ? ' flag' : ''); }
+
+/* ------------------------------------------------------------------ running */
+async function beginScenario() {
+  ids = {}; sc().people.forEach(p => ids[p] = uuid());
+  ticket = uuid(); event = uuid(); results = [];
+  baseline = current = await snapshot();
+  renderCounters();
+}
+async function runStep() {
+  if (busy || stepIndex >= sc().steps.length) return;
+  busy = true; renderSteps();
+  const st = sc().steps[stepIndex];
+  try {
+    if (stepIndex === 0) await beginScenario();
+    addLog('step', `${stepIndex + 1}. ${st.title}`);
+    const body = { event_id: event, ticket_id: ticket, buyer_id: ids[st.to], seller_id: st.from ? ids[st.from] : PLATFORM,
+                   purchase_price: st.face, resale_price: st.price, transaction_type: st.type, fraud_pattern: 'demo' };
+    addLog('api', 'POST /transactions   ' + JSON.stringify(body));
+    await post('/transactions', body);
+    await pullCommands();
+
+    addLog('api', 'POST /sync');
+    await post('/sync');
+    await pullCommands();
+
+    addLog('api', 'GET /demo/graph?ticket_id=' + ticket + '   (draws the graph on the right)');
+    const g = await j('/demo/graph?ticket_id=' + ticket);
+    await pullCommands();
+    drawGraph(g);
+
+    let flagText = null;
+    if (sc().metric === 'cycles') {
+      addLog('api', 'GET /fraud/cycles');
+      const cycles = await j('/fraud/cycles');
+      const hit = cycles.find(c => c.ticket_id === ticket);
+      addLog('detect', hit ? 'FLAGGED: ' + hit.reason : `no loop through this ticket yet (${cycles.length} loops flagged in total)`);
+      if (hit) { flagGraph(hit.accounts); flagText = hit.reason; }
+    } else if (st.flagsPrice || stepIndex > 0) {
+      addLog('api', 'GET /fraud/pricing');
+      const rows = await j('/fraud/pricing?limit=5000');
+      const hit = rows.find(p => p.ticket_id === ticket);
+      addLog('detect', hit ? 'FLAGGED: ' + hit.reason : 'no price anomaly for this ticket');
+      if (hit) { flagGraph(null, 'e' + (g.transfers.length - 1)); flagText = hit.reason; }
+    }
+
+    const after = await snapshot();
+    const d = { tx: after.tx - current.tx, acc: after.acc - current.acc, tr: after.tr - current.tr };
+    current = after; renderCounters();
+    results[stepIndex] = { flag: !!flagText,
+      text: flagText ? 'Flagged: ' + flagText : `Cassandra +${d.tx} transaction. Neo4j +${d.acc} account${d.acc === 1 ? '' : 's'}, +${d.tr} transfer${d.tr === 1 ? '' : 's'}.` };
+    banner(flagText ? 'Detected: ' + flagText : 'Nothing flagged yet.', !!flagText);
+    stepIndex++;
+  } catch (e) {
+    addLog('api', 'ERROR: ' + e.message + '  (are both databases running?)');
+  }
+  busy = false; renderSteps();
+}
+async function runAll() { while (stepIndex < sc().steps.length && !busy) { const before = stepIndex; await runStep(); if (stepIndex === before) break; await sleep(1300); } }
+
+async function startOver(silent) {
+  busy = true; renderSteps();
+  try {
+    if (!silent) addLog('api', 'POST /demo/reset   (removes this demo\'s transactions from both databases)');
+    const r = await post('/demo/reset');
+    if (silent) { const c = await j('/commands?limit=0'); lastCmd = c.last_id; } else { await pullCommands(); addLog('api', `removed ${r.deleted} demo transaction(s)`); }
+  } catch (e) { addLog('api', 'ERROR: ' + e.message + '  (are both databases running?)'); }
+  stepIndex = 0; results = []; baseline = null; ticket = null;
+  clearGraph(); banner('Nothing flagged yet.');
+  try { current = await snapshot(); } catch (e) { current = null; }
+  renderCounters();
+  busy = false; renderSteps();
+}
+
+/* ------------------------------------------------------------------ wiring */
+$('#next').onclick = runStep;
+$('#all').onclick = runAll;
+$('#reset').onclick = () => { clearLog(); startOver(false); };
+$('#tabs').onclick = e => {
+  const b = e.target.closest('button'); if (!b || busy || b.dataset.k === key) return;
+  key = b.dataset.k; renderTabs(); $('#intro').textContent = sc().intro; clearLog(); startOver(true);
+};
+renderTabs(); $('#intro').textContent = sc().intro; renderSteps(); renderCounters();
+startOver(true);   // start clean: removes anything a previous demo run left behind
+</script>
+</body>
+</html>
