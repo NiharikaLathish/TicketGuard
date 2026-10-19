@@ -337,6 +337,23 @@ $('#p-undo').onclick = async () => {
 };
 
 refresh();
+
+/* Keep this page current when data changes anywhere else: the live page, Swagger, another window. */
+let lastCmd = null, watching = false;
+async function watch() {
+  if (watching) return;
+  watching = true;
+  try {
+    if (lastCmd === null) { lastCmd = (await j('/commands?limit=0')).last_id; return; }
+    const r = await j('/commands?after=' + lastCmd);
+    lastCmd = r.last_id;
+    if (!r.commands.length) return;
+    if (r.commands.some(c => c.store === 'cassandra')) await sync();   // new rows in Cassandra: copy them to Neo4j now
+    refresh();
+  } catch (e) { /* the server is restarting or a database is briefly down: try again next time */ }
+  finally { watching = false; }
+}
+setInterval(watch, 1500);
 </script>
 </body>
 </html>
