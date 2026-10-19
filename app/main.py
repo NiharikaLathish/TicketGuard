@@ -3,6 +3,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -247,3 +248,96 @@ def demo_reset():
         if cassandra_db.delete_transaction(tid):
             neo4j_db.delete_transaction(tid)
     return {"deleted": len(ids)}
+
+
+# ---------------------------------------------------------------- live feed page (hidden from Swagger)
+LIVE_NS = uuid.UUID("6f1c2b7e-0b0f-4f43-9c3a-5d1f0c0a7e11")
+_live_names: dict[str, str] = {}  # account / ticket id -> the name typed on the live page
+
+
+class LiveTransaction(BaseModel):
+    seller: str | None = None  # blank (or "platform") means the platform sells: a primary purchase
+    buyer: str = Field(min_length=1)
+    ticket: str = Field(min_length=1)
+    face: float = Field(default=100, ge=0)
+    price: float = Field(default=0, ge=0)
+    type: str = Field(default="Resale", pattern="^(Purchase|Resale|Transfer)$")
+
+
+def _live_id(kind: str, name: str) -> uuid.UUID:
+    """The same name always gives the same id, so typing "Alice" twice means the same account."""
+    return uuid.uuid5(LIVE_NS, f"{kind}:{name.strip().lower()}")
+
+
+def _live_account(name: str | None) -> uuid.UUID:
+    if not name or not name.strip() or name.strip().lower() == "platform":
+        return uuid.UUID(config.PLATFORM_ACCOUNT_ID)
+    account = _live_id("account", name)
+    _live_names.setdefault(str(account), name.strip())
+    return account
+
+
+@app.get("/live", include_in_schema=False)
+def live_page():
+    return FileResponse(STATIC / "live.html")
+
+
+@app.get("/live/now", include_in_schema=False)
+def live_now():
+    return {"now_ms": int(datetime.now(timezone.utc).timestamp() * 1000)}
+
+
+@app.post("/live/transaction", status_code=201, include_in_schema=False)
+def live_transaction(body: LiveTransaction):
+    """Insert one transaction described with names ("Alice", "T1"). Labelled 'demo' so Start over removes it."""
+    seller, buyer = _live_account(body.seller), _live_account(body.buyer)
+    platform = uuid.UUID(config.PLATFORM_ACCOUNT_ID)
+    if buyer == platform:
+        raise HTTPException(400, "the platform cannot be the buyer")
+    if buyer == seller:
+        raise HTTPException(400, "buyer and seller must be different accounts")
+    if body.type == "Purchase" and seller != platform:
+        raise HTTPException(400, "a purchase comes from the platform: leave From blank")
+    ticket = _live_id("ticket", body.ticket)
+    _live_names.setdefault(str(ticket), body.ticket.strip())
+    kind = "Purchase" if seller == platform else body.type
+    tx = {"transaction_id": uuid.uuid4(), "event_id": _live_id("event", "live"), "ticket_id": ticket,
+          "buyer_id": buyer, "seller_id": seller, "ts": datetime.now(timezone.utc),
+          "purchase_price": body.face, "resale_price": 0.0 if kind == "Purchase" else body.price,
+          "transaction_type": kind, "fraud_pattern": "demo"}
+    return _serialise(cassandra_db.insert_transaction(tx))
+
+
+@app.get("/live/graph", include_in_schema=False)
+def live_graph(since_ms: int, limit: int = Query(300, le=1000)):
+    """Everything stored since the live page opened, read back from Neo4j."""
+    return {**neo4j_db.live_graph(since_ms, limit), "names": _live_names}
+
+
+@app.post("/live/clear", include_in_schema=False)
+def live_clear(since_ms: int):
+    """Delete the transactions created since the live page opened, from both databases."""
+    if since_ms < int(datetime.now(timezone.utc).timestamp() * 1000) - 12 * 3600 * 1000:
+        raise HTTPException(400, "since_ms is too old for a live session")  # never reach into the sample data
+    sync.run_sync()
+    ids = neo4j_db.live_transaction_ids(since_ms)
+    for tid in ids:  # newest first, so the graph cleanup unwinds in reverse order
+        if cassandra_db.delete_transaction(tid):
+            neo4j_db.delete_transaction(tid)
+    return {"deleted": len(ids)}
+
+
+@app.middleware("http")
+async def log_incoming_writes(request, call_next):
+    """Show data changes sent from Swagger, the console or curl in the demo command log.
+
+    Calls made by the demo and live pages are skipped: they print their own, more detailed, lines.
+    """
+    path = request.url.path
+    if request.method in ("POST", "PUT", "DELETE") and not path.startswith(("/live", "/demo", "/commands")):
+        ref = urlparse(request.headers.get("referer", "")).path
+        if not ref.startswith(("/demo", "/live")):
+            source = "Swagger" if ref.startswith("/docs") else "the console" if ref == "/" else "a direct call"
+            query = f"?{request.url.query}" if request.url.query else ""
+            commandlog.record("api", f"{request.method} {path}{query}   (from {source})")
+    return await call_next(request)

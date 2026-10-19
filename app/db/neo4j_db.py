@@ -224,3 +224,24 @@ def demo_transaction_ids() -> list[str]:
     """Ids of transactions created by the demo page (labelled fraud_pattern 'demo'), newest first."""
     rows = run("MATCH (x:Transaction {fraud_pattern: 'demo'}) RETURN x.transaction_id AS id ORDER BY x.ts DESC")
     return [r["id"] for r in rows]
+
+
+# ---------------------------------------------------------------- live feed helpers
+def live_graph(since_ms: int, limit: int = 300) -> dict:
+    """Every transaction stored at or after `since_ms`, as transfers (drawn on the live feed page)."""
+    rows = run("""MATCH (x:Transaction) WHERE x.ts >= $since
+MATCH (x)-[:MADE_BY]->(b:Account), (x)-[:INVOLVES]->(t:Ticket)
+OPTIONAL MATCH (s:Account)-[:TRANSFERRED_TO {tx_id: x.transaction_id}]->(b)
+RETURN x.transaction_id AS tx, t.ticket_id AS ticket, x.transaction_type AS type,
+       s.account_id AS seller, b.account_id AS buyer,
+       x.purchase_price AS face, x.resale_price AS price, x.ts AS ts
+ORDER BY x.ts LIMIT $limit""", since=since_ms, limit=limit)
+    platform = config.PLATFORM_ACCOUNT_ID
+    return {"platform": platform, "transfers": [{**r, "seller": r["seller"] or platform} for r in rows]}
+
+
+def live_transaction_ids(since_ms: int) -> list[str]:
+    """Ids of every transaction stored at or after `since_ms`, newest first."""
+    rows = run("MATCH (x:Transaction) WHERE x.ts >= $since RETURN x.transaction_id AS id ORDER BY x.ts DESC",
+               since=since_ms)
+    return [r["id"] for r in rows]
