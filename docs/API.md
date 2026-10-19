@@ -56,3 +56,13 @@ curl -X POST localhost:8000/transactions -H "Content-Type: application/json" -d 
   "purchase_price":100,"resale_price":140,"transaction_type":"Resale"}'
 curl localhost:8000/fraud/summary
 ```
+
+## Demo helper endpoints (not listed in Swagger)
+Used by the live demo page at `/demo`. They are hidden from `/docs` so the public API stays the 20 endpoints above.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/demo` | The live demo page |
+| GET | `/commands?after=&limit=` | Recent CQL / Cypher / sync commands the app ran, with the id of the newest one |
+| GET | `/demo/graph?ticket_id=` | Every transfer of one ticket as stored in Neo4j (drawn on the demo page) |
+| POST | `/demo/reset` | Delete every transaction the demo created (labelled `fraud_pattern = 'demo'`) from both databases |

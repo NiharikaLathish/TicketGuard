@@ -20,6 +20,7 @@ uvicorn app.main:app --reload              # API docs: http://localhost:8000/doc
 ```
 
 Open http://localhost:8000/ for the fraud console (graph of detected rings and the reasons they were flagged).
+Open http://localhost:8000/demo for the step-by-step live demo: it runs a scenario one command at a time, shows the exact CQL and Cypher that reach Cassandra and Neo4j, and draws the graph as it grows (script: `docs/DEMO_SCRIPT.md`).
 
 Evaluation vs. ground truth: `python -m scripts.evaluate`
 
@@ -33,11 +34,12 @@ Database dump: `python -m scripts.dump` (writes to `dumps/`).
 | `app/db/cassandra_db.py` | Cassandra schema and CRUD (four query-driven tables) |
 | `app/db/neo4j_db.py` | Neo4j constraints/indexes, graph upsert, account/ticket CRUD |
 | `app/sync.py` | Incremental Cassandra -> Neo4j sync (watermark, idempotent MERGE) |
+| `app/commandlog.py` | In-memory log of the CQL / Cypher commands, shown on the live demo page |
 | `app/sync_worker.py` | Background thread that runs the sync every `SYNC_INTERVAL_SECONDS` (default 60; 0 = off) |
 | `app/detection.py` | Cycles, community detection, hub centrality, pricing anomalies |
 | `app/main.py` | FastAPI endpoints (see `docs/API.md`) |
 | `generator/generate.py` | Synthetic data with labelled fraud patterns |
-| `static/index.html` | Visualisation |
+| `static/index.html`, `static/demo.html` | Fraud console and live demo page |
 | `tests/` | pytest integration tests (19), including detection recall/precision vs. ground truth |
 | `docs/` | API reference, `queries.md` (CQL and Cypher showcase with real output), `test_plan.md`, progress report |
 | `dumps/` | Sample dataset, ground truth, database exports |
