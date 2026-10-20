@@ -69,7 +69,7 @@ Used by the live demo page at `/demo`. They are hidden from `/docs` so the publi
 | GET | `/live` | The live feed page |
 | GET | `/live/now` | Server time in milliseconds (the live page's starting point) |
 | POST | `/live/transaction` | Insert one transaction described with names: `seller` (blank = platform), `buyer`, `ticket`, `face`, `price`, `type`. The same name is always the same account |
-| GET | `/live/graph?since_ms=` | Every transaction stored since that time, read back from Neo4j, plus the names typed on the live page |
-| POST | `/live/clear?since_ms=` | Delete the transactions created since the live page opened, from both databases (refuses a start time older than 12 hours) |
+| GET | `/live/graph?since_ms=` | Everything sent from the live feed (kept until cleared) plus anything stored since that time, read back from Neo4j, with the names typed on the live page |
+| POST | `/live/clear?since_ms=` | Delete everything sent from the live feed, plus anything stored since that time, from both databases (refuses a start time older than 12 hours) |
 
 Writes sent from Swagger, the console or curl are also shown in the demo command log as `API  POST /... (from Swagger)`.

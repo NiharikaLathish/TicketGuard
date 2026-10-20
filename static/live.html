@@ -132,7 +132,7 @@
     </section>
 
     <section class="panel">
-      <div class="panel-h"><h2>What Neo4j holds right now</h2><small>activity since this page opened</small></div>
+      <div class="panel-h"><h2>What Neo4j holds right now</h2><small>everything sent from here, kept until cleared</small></div>
       <div class="counters" id="counters"></div>
       <div class="canvas"><div id="net"></div><div class="note" id="gnote">Nothing yet. Send a transaction and it will appear here.</div></div>
       <div class="banner" id="banner"><div>Nothing flagged yet.</div></div>
@@ -339,7 +339,7 @@ $('#form').onsubmit = async e => {
 $('#clear').onclick = async () => {
   $('#clear').disabled = true;
   try {
-    addLog('api', 'POST /live/clear   (removes everything sent since this page opened, from both databases)');
+    addLog('api', 'POST /live/clear   (removes everything sent from the live feed, from both databases)');
     const r = await post('/live/clear?since_ms=' + sinceMs);
     addLog('api', `removed ${r.deleted} transaction(s)`);
     needsRefresh = true; flaggedKey = ''; setTimeout(tick, 30);
@@ -350,7 +350,6 @@ $('#clear').onclick = async () => {
 /* ------------------------------------------------------------------ start */
 (async function init() {
   try {
-    await post('/demo/reset');                       // start clean: removes anything a previous demo left behind
     sinceMs = (await j('/live/now')).now_ms;
     lastCmd = (await j('/commands?limit=0')).last_id;
     baseline = current = await snapshot(); renderCounters();

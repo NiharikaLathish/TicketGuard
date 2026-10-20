@@ -310,13 +310,13 @@ def live_transaction(body: LiveTransaction):
 
 @app.get("/live/graph", include_in_schema=False)
 def live_graph(since_ms: int, limit: int = Query(300, le=1000)):
-    """Everything stored since the live page opened, read back from Neo4j."""
+    """Everything sent from the live feed (kept until cleared), plus anything stored since the page opened, read back from Neo4j."""
     return {**neo4j_db.live_graph(since_ms, limit), "names": _live_names}
 
 
 @app.post("/live/clear", include_in_schema=False)
 def live_clear(since_ms: int):
-    """Delete the transactions created since the live page opened, from both databases."""
+    """Delete everything sent from the live feed, plus anything stored since the page opened, from both databases."""
     if since_ms < int(datetime.now(timezone.utc).timestamp() * 1000) - 12 * 3600 * 1000:
         raise HTTPException(400, "since_ms is too old for a live session")  # never reach into the sample data
     sync.run_sync()
